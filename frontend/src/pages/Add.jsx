@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import CategoryChips from '../components/CategoryChips.jsx'
-import TagPicker from '../components/TagPicker.jsx'
 import { todayISO } from '../format.js'
 import { useSpace } from '../spaces.jsx'
 
@@ -20,16 +19,13 @@ export default function Add() {
   const [categories, setCategories] = useState([])
   const [members, setMembers] = useState([])
   const [paymentMethods, setPaymentMethods] = useState([])
-  const [spaceTags, setSpaceTags] = useState([])
   const [amount, setAmount] = useState('')
   const [type, setType] = useState('expense')
-  const [categoryId, setCategoryId] = useState(null)
+  const [categoryIds, setCategoryIds] = useState([])
   const [date, setDate] = useState(todayISO())
   const [pmId, setPmId] = useState(null)
   const [paidBy, setPaidBy] = useState(user.id)
   const [description, setDescription] = useState('')
-  const [tags, setTags] = useState([])
-  const [showTags, setShowTags] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
@@ -40,7 +36,6 @@ export default function Add() {
   useEffect(() => {
     api(`/api/spaces/${space.id}/categories`).then(setCategories).catch(() => {})
     api(`/api/spaces/${space.id}/members`).then(setMembers).catch(() => {})
-    api(`/api/spaces/${space.id}/tags`).then(setSpaceTags).catch(() => {})
     api(`/api/spaces/${space.id}/payment-methods`)
       .then((pms) => {
         setPaymentMethods(pms)
@@ -48,8 +43,7 @@ export default function Add() {
         setPmId(pms.some((p) => p.id === remembered) ? remembered : (pms[0]?.id ?? null))
       })
       .catch(() => {})
-    setCategoryId(null)
-    setTags([])
+    setCategoryIds([])
     setPaidBy(user.id)
   }, [space.id, user.id, pmKey])
 
@@ -68,20 +62,15 @@ export default function Add() {
           amount: Math.round(parsed * 100) / 100,
           type,
           occurred_on: date,
-          category_id: categoryId,
+          category_ids: categoryIds,
           payment_method_id: pmId,
           paid_by: paidBy,
           description: description.trim(),
-          tags,
         },
       })
       if (pmId) localStorage.setItem(pmKey, pmId)
-      if (tags.length) {
-        api(`/api/spaces/${space.id}/tags`).then(setSpaceTags).catch(() => {})
-      }
       setAmount('')
       setDescription('')
-      setTags([])
       setToast('Saved ✓')
       setTimeout(() => setToast(''), 1800)
       amountRef.current?.focus()
@@ -124,7 +113,7 @@ export default function Add() {
         />
       </div>
 
-      <CategoryChips categories={categories} value={categoryId} onChange={setCategoryId} />
+      <CategoryChips categories={categories} value={categoryIds} onChange={setCategoryIds} />
 
       <div className="seg" aria-label="Date">
         <button
@@ -188,17 +177,6 @@ export default function Add() {
           maxLength={500}
         />
       </div>
-
-      {showTags ? (
-        <div className="field">
-          <label>Tags</label>
-          <TagPicker suggestions={spaceTags} value={tags} onChange={setTags} />
-        </div>
-      ) : (
-        <button type="button" className="linklike" onClick={() => setShowTags(true)}>
-          🏷️ Add tags
-        </button>
-      )}
 
       {error && <p className="error">{error}</p>}
       <button className="btn block" disabled={!valid || busy} style={{ marginTop: 12 }}>

@@ -46,15 +46,17 @@ scripts/
 ## Current API surface
 
 Feature routers live in `backend/app/routers/` (auth, spaces, categories,
-payment_methods, tags, transactions, reports), registered in `app/main.py`
+payment_methods, transactions, reports), registered in `app/main.py`
 **above** the SPA catch-all. Shared deps in `app/deps.py` (`CurrentUser`,
 `DbSession`), security helpers (argon2, cookie sessions, login rate
 limiting) in `app/security.py`, ORM models in `app/models.py`, per-space
-seed data in `app/services/seeds.py`, tag upsert in `app/services/tags.py`.
-Schema = alembic migrations `0001`–`0005` (app_meta, auth,
-spaces/invites/categories, transactions, payment-methods/tags).
-Payment methods are per-space rows (NOT an enum); tags are optional
-multi-tags upserted by name via the transactions API.
+seed data in `app/services/seeds.py`. Schema = alembic migrations
+`0001`–`0006` (app_meta, auth, spaces/invites/categories, transactions,
+payment-methods, unified categories). Payment methods are per-space rows
+(NOT an enum). Categories are UNIFIED (owner decision, v1.2): a record
+carries an ordered `category_ids` list — position 0 is the MAIN category
+(drives the by-category report); reports accept a `category_id` filter
+matching any position. There is no separate tags concept.
 `backend/scripts/seed_demo.py` seeds a demo user with 6 months of data
 (`demo@masareef.app` / `demo1234`) — local/staging only, NEVER prod.
 `backend/scripts/import_notion_csv.py` imports the owner's Notion CSV
@@ -62,7 +64,9 @@ export (tag→category/payment/tag mapping documented in its docstring; the
 Notion DB itself is live prod data — READ-ONLY, never modify it).
 
 Design specs: `docs/superpowers/specs/2026-07-20-masareef-expense-tracker-design.md`
-(v1) + `2026-07-20-notion-alignment-design.md` (v1.1, real-data alignment).
+(v1) + `2026-07-20-notion-alignment-design.md` (v1.1, real-data alignment)
++ `2026-07-20-unified-categories-design.md` (v1.2, tags folded into
+categories).
 
 Template basics still present in `app/main.py`:
 

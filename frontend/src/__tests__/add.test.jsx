@@ -81,12 +81,11 @@ describe('Add', () => {
     expect(String(url)).toBe('/api/spaces/s1/transactions')
     const body = JSON.parse(opts.body)
     expect(body.amount).toBe(99)
-    expect(body.category_id).toBe('c1')
+    expect(body.category_ids).toEqual(['c1']) // ordered, first = main
     expect(body.type).toBe('expense')
     expect(body.description).toBe('veggies')
     expect(body.paid_by).toBe('u1')
     expect(body.payment_method_id).toBe('p1') // space's first method by default
-    expect(body.tags).toEqual([])
 
     await waitFor(() => {
       expect(screen.getByLabelText('Amount').value).toBe('')

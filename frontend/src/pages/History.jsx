@@ -9,12 +9,11 @@ const PAGE = 100
 export default function History() {
   const { space } = useSpace()
   const [month, setMonth] = useState(thisMonth())
-  const [filters, setFilters] = useState({ category_id: '', paid_by: '', type: '', tag: '', q: '' })
+  const [filters, setFilters] = useState({ category_id: '', paid_by: '', type: '', q: '' })
   const [data, setData] = useState({ items: [], total: 0 })
   const [categories, setCategories] = useState([])
   const [members, setMembers] = useState([])
   const [paymentMethods, setPaymentMethods] = useState([])
-  const [spaceTags, setSpaceTags] = useState([])
   const [editing, setEditing] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -27,7 +26,6 @@ export default function History() {
     api(`/api/spaces/${space.id}/payment-methods?include_archived=1`)
       .then(setPaymentMethods)
       .catch(() => {})
-    api(`/api/spaces/${space.id}/tags`).then(setSpaceTags).catch(() => {})
   }, [space.id])
 
   const load = useCallback(
@@ -120,20 +118,6 @@ export default function History() {
           <option value="expense">Expenses</option>
           <option value="income">Income</option>
         </select>
-        {spaceTags.length > 0 && (
-          <select
-            value={filters.tag}
-            onChange={(e) => setFilters({ ...filters, tag: e.target.value })}
-            style={{ flex: 1, padding: 9, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}
-          >
-            <option value="">All tags</option>
-            {spaceTags.map((t) => (
-              <option key={t.id} value={t.name}>
-                🏷️ {t.name}
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -153,17 +137,17 @@ export default function History() {
             </div>
             {g.items.map((tx) => (
               <div key={tx.id} className="tx" onClick={() => setEditing(tx)}>
-                <span className="emoji">{tx.type === 'income' ? '💰' : tx.category?.emoji || '❔'}</span>
+                <span className="emoji">{tx.type === 'income' ? '💰' : tx.categories[0]?.emoji || '❔'}</span>
                 <div className="body">
                   <div className="title" dir="auto">
-                    {tx.description || tx.category?.name || (tx.type === 'income' ? 'Income' : 'Expense')}
+                    {tx.description || tx.categories[0]?.name || (tx.type === 'income' ? 'Income' : 'Expense')}
                   </div>
                   <div className="sub" dir="auto">
                     {[
-                      tx.description ? tx.category?.name : null,
+                      tx.description ? tx.categories[0]?.name : null,
+                      ...tx.categories.slice(1).map((c) => `${c.emoji}${c.name}`),
                       tx.paid_by_name,
                       tx.payment_method?.name,
-                      ...tx.tags.map((t) => `🏷️${t.name}`),
                     ]
                       .filter(Boolean)
                       .join(' · ')}
@@ -188,12 +172,13 @@ export default function History() {
       {editing && (
         <TxEditor
           tx={editing}
-          categories={categories.filter((c) => !c.is_archived || c.id === editing.category?.id)}
+          categories={categories.filter(
+            (c) => !c.is_archived || editing.categories.some((ec) => ec.id === c.id),
+          )}
           members={members}
           paymentMethods={paymentMethods.filter(
             (p) => !p.is_archived || p.id === editing.payment_method?.id,
           )}
-          spaceTags={spaceTags}
           onSaved={() => {
             setEditing(null)
             load(0)
