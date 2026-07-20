@@ -46,16 +46,23 @@ scripts/
 ## Current API surface
 
 Feature routers live in `backend/app/routers/` (auth, spaces, categories,
-transactions, reports), registered in `app/main.py` **above** the SPA
-catch-all. Shared deps in `app/deps.py` (`CurrentUser`, `DbSession`),
-security helpers (argon2, cookie sessions, login rate limiting) in
-`app/security.py`, ORM models in `app/models.py`, per-space seed data in
-`app/services/seeds.py`. Schema = alembic migrations `0001`–`0004`
-(app_meta, auth, spaces/invites/categories, transactions).
+payment_methods, tags, transactions, reports), registered in `app/main.py`
+**above** the SPA catch-all. Shared deps in `app/deps.py` (`CurrentUser`,
+`DbSession`), security helpers (argon2, cookie sessions, login rate
+limiting) in `app/security.py`, ORM models in `app/models.py`, per-space
+seed data in `app/services/seeds.py`, tag upsert in `app/services/tags.py`.
+Schema = alembic migrations `0001`–`0005` (app_meta, auth,
+spaces/invites/categories, transactions, payment-methods/tags).
+Payment methods are per-space rows (NOT an enum); tags are optional
+multi-tags upserted by name via the transactions API.
 `backend/scripts/seed_demo.py` seeds a demo user with 6 months of data
 (`demo@masareef.app` / `demo1234`) — local/staging only, NEVER prod.
+`backend/scripts/import_notion_csv.py` imports the owner's Notion CSV
+export (tag→category/payment/tag mapping documented in its docstring; the
+Notion DB itself is live prod data — READ-ONLY, never modify it).
 
-Design spec: `docs/superpowers/specs/2026-07-20-masareef-expense-tracker-design.md`.
+Design specs: `docs/superpowers/specs/2026-07-20-masareef-expense-tracker-design.md`
+(v1) + `2026-07-20-notion-alignment-design.md` (v1.1, real-data alignment).
 
 Template basics still present in `app/main.py`:
 
