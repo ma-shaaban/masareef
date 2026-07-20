@@ -55,8 +55,10 @@ seed data in `app/services/seeds.py`. Schema = alembic migrations
 payment-methods, unified categories). Payment methods are per-space rows
 (NOT an enum). Categories are UNIFIED (owner decision, v1.2): a record
 carries an ordered `category_ids` list — position 0 is the MAIN category
-(drives the by-category report); reports accept a `category_id` filter
-matching any position. There is no separate tags concept.
+(drives the by-category report). Listing + all report endpoints accept
+repeatable `category_ids` (include, any-of, any position) and
+`exclude_category_ids` (none-of) filters. There is no separate tags
+concept.
 `backend/scripts/seed_demo.py` seeds a demo user with 6 months of data
 (`demo@masareef.app` / `demo1234`) — local/staging only, NEVER prod.
 `backend/scripts/import_notion_csv.py` imports the owner's Notion CSV

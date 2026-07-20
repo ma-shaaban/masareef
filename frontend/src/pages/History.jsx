@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
+import CategoryFilter from '../components/CategoryFilter.jsx'
 import TxEditor from '../components/TxEditor.jsx'
 import { addMonths, fmtDay, fmtMoney, monthLabel, monthRange, thisMonth } from '../format.js'
 import { useSpace } from '../spaces.jsx'
@@ -9,7 +10,9 @@ const PAGE = 100
 export default function History() {
   const { space } = useSpace()
   const [month, setMonth] = useState(thisMonth())
-  const [filters, setFilters] = useState({ category_id: '', paid_by: '', type: '', q: '' })
+  const [filters, setFilters] = useState({ paid_by: '', type: '', q: '' })
+  const [catInclude, setCatInclude] = useState([])
+  const [catExclude, setCatExclude] = useState([])
   const [data, setData] = useState({ items: [], total: 0 })
   const [categories, setCategories] = useState([])
   const [members, setMembers] = useState([])
@@ -37,6 +40,8 @@ export default function History() {
       for (const [k, v] of Object.entries(filters)) {
         if (v) params.set(k, v)
       }
+      for (const id of catInclude) params.append('category_ids', id)
+      for (const id of catExclude) params.append('exclude_category_ids', id)
       try {
         const page = await api(`/api/spaces/${space.id}/transactions?${params}`)
         setData((prev) =>
@@ -48,7 +53,7 @@ export default function History() {
         setLoading(false)
       }
     },
-    [space.id, month, filters],
+    [space.id, month, filters, catInclude, catExclude],
   )
 
   useEffect(() => {
@@ -82,19 +87,17 @@ export default function History() {
         </button>
       </div>
 
+      <CategoryFilter
+        categories={categories.filter((c) => !c.is_archived)}
+        include={catInclude}
+        exclude={catExclude}
+        onChange={(inc, exc) => {
+          setCatInclude(inc)
+          setCatExclude(exc)
+        }}
+      />
+
       <div className="seg">
-        <select
-          value={filters.category_id}
-          onChange={(e) => setFilters({ ...filters, category_id: e.target.value })}
-          style={{ flex: 1, padding: 9, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card)' }}
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.emoji} {c.name}
-            </option>
-          ))}
-        </select>
         {members.length > 1 && (
           <select
             value={filters.paid_by}

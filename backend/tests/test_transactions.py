@@ -109,7 +109,7 @@ def test_list_filters_and_pagination(client):
 
     by_cat = client.get(
         f"/api/spaces/{space['id']}/transactions",
-        params={"category_id": cats["Groceries"]["id"]},
+        params={"category_ids": [cats["Groceries"]["id"]]},
     ).json()
     assert by_cat["total"] == 2
 

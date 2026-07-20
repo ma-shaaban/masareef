@@ -47,7 +47,7 @@ def test_filter_matches_any_position(client):
     add_tx(client, space["id"], amount=30)
     r = client.get(
         f"/api/spaces/{space['id']}/transactions",
-        params={"category_id": cats["Groceries"]["id"]},
+        params={"category_ids": [cats["Groceries"]["id"]]},
     ).json()
     assert r["total"] == 1
     assert r["items"][0]["amount"] == 10

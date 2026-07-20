@@ -214,6 +214,20 @@ input, textarea, select, button { font: inherit; color: inherit; }
   border-color: var(--accent);
   font-weight: 600;
 }
+.chips button.exclude {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  border-color: var(--danger);
+  text-decoration: line-through;
+}
+.chips button.clear { color: var(--muted); border-style: dashed; }
+.chips.scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.chips.scroll button { flex-shrink: 0; }
 
 .toast {
   position: fixed;

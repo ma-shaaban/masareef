@@ -11,6 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import { api } from '../api.js'
+import CategoryFilter from '../components/CategoryFilter.jsx'
 import { addMonths, fmtMoney, monthLabel, monthRange, thisMonth } from '../format.js'
 import { useSpace } from '../spaces.jsx'
 
@@ -35,7 +36,8 @@ export default function Reports() {
   const [preset, setPreset] = useState('month')
   const [month, setMonth] = useState(thisMonth())
   const [categories, setCategories] = useState([])
-  const [categoryId, setCategoryId] = useState('')
+  const [catInclude, setCatInclude] = useState([])
+  const [catExclude, setCatExclude] = useState([])
   const [summary, setSummary] = useState(null)
   const [byCategory, setByCategory] = useState([])
   const [byMember, setByMember] = useState([])
@@ -45,15 +47,17 @@ export default function Reports() {
   const { from, to } = rangeFor(preset, month)
 
   useEffect(() => {
-    api(`/api/spaces/${space.id}/categories?include_archived=1`)
-      .then(setCategories)
-      .catch(() => {})
-    setCategoryId('')
+    api(`/api/spaces/${space.id}/categories`).then(setCategories).catch(() => {})
+    setCatInclude([])
+    setCatExclude([])
   }, [space.id])
 
   useEffect(() => {
     setError('')
-    const cat = categoryId ? `&category_id=${categoryId}` : ''
+    const catParams = new URLSearchParams()
+    for (const id of catInclude) catParams.append('category_ids', id)
+    for (const id of catExclude) catParams.append('exclude_category_ids', id)
+    const cat = catParams.size ? `&${catParams}` : ''
     const params = new URLSearchParams({ from, to })
     Promise.all([
       preset === 'month'
@@ -70,7 +74,7 @@ export default function Reports() {
         setMonthly(months)
       })
       .catch((err) => setError(err.message))
-  }, [space.id, preset, month, from, to, categoryId])
+  }, [space.id, preset, month, from, to, catInclude, catExclude])
 
   const money = (n) => fmtMoney(n, space.currency)
   const rangeTotal = byCategory.reduce((sum, c) => sum + c.total, 0)
@@ -118,20 +122,15 @@ export default function Reports() {
         </div>
       )}
 
-      <div className="field">
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          aria-label="Filter by category"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.emoji} {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <CategoryFilter
+        categories={categories}
+        include={catInclude}
+        exclude={catExclude}
+        onChange={(inc, exc) => {
+          setCatInclude(inc)
+          setCatExclude(exc)
+        }}
+      />
 
       {error && <p className="error">{error}</p>}
 
