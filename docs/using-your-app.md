@@ -44,3 +44,13 @@ Use production for:
 **The habit:** every change appears on **staging** first. When it looks good
 there, you **release** it to **production**. How that works step by step is on
 the **[Developing with AI](developing-with-ai.md)** page.
+
+## Install it on your phone
+
+Masareef is a PWA — it installs from the browser, no app store needed:
+
+1. Open the app in **Chrome** on your phone.
+2. Tap the **⋮ menu → "Install app"** (or "Add to Home screen").
+3. It appears on your home screen with its own icon and opens full-screen.
+
+On iPhone: open it in **Safari**, tap **Share → "Add to Home Screen"**.

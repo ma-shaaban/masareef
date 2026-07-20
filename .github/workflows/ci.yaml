@@ -24,7 +24,52 @@ permissions:
                   # forks (security boundary; see README).
 
 jobs:
+  # App test gate (diverges from template: backend pytest against a real
+  # Postgres + frontend vitest/build). The image build depends on it, so
+  # nothing deploys with failing tests.
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: masareef
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: masareef_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12" # match the runtime image (Dockerfile)
+
+      - name: Backend tests
+        env:
+          TEST_DB_HOST: localhost
+          TEST_DB_PORT: "5432"
+        run: |
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+          cd backend && pytest tests -v
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24" # match the Dockerfile build stage
+
+      - name: Frontend tests + build
+        run: |
+          cd frontend
+          npm ci
+          npm run test -- --run
+          npm run build
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
