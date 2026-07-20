@@ -7,7 +7,7 @@ import io
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from scripts.import_notion_csv import import_csv, parse_date, parse_price
+from app.services.notion_import import import_csv, parse_date, parse_price
 
 CSV_TEXT = """Name,Price,Date,Tags,Attachment
 صيدلية,935,"July 17, 2026",,
@@ -45,7 +45,14 @@ def run_import(client, dry_run=False):
     try:
         user = db.query(models.User).filter(models.User.email == "mah@example.com").one()
         space = db.get(models.Space, space_json["id"])
-        stats = import_csv(db, csv.DictReader(io.StringIO(CSV_TEXT)), user, space, dry_run=dry_run)
+        stats = import_csv(
+            db, csv.DictReader(io.StringIO(CSV_TEXT)), space,
+            paid_by=user.id, created_by=user.id,
+        )
+        if dry_run:
+            db.rollback()
+        else:
+            db.commit()
     finally:
         db.close()
     return space_json, stats
