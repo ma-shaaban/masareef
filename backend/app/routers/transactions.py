@@ -54,6 +54,36 @@ def validate_category(db: Session, space_id: uuid.UUID, category_id: uuid.UUID) 
         raise HTTPException(status_code=422, detail="Unknown category for this space")
 
 
+def apply_category_filters(
+    db: Session,
+    query,
+    space_id: uuid.UUID,
+    include_ids: list[uuid.UUID],
+    exclude_ids: list[uuid.UUID],
+):
+    """ANY-of the included categories (any position) and NONE-of the
+    excluded ones. Ids are validated against the space (422 otherwise)."""
+    for cid in [*include_ids, *exclude_ids]:
+        validate_category(db, space_id, cid)
+    if include_ids:
+        query = query.filter(
+            models.Transaction.id.in_(
+                db.query(models.TransactionCategory.transaction_id).filter(
+                    models.TransactionCategory.category_id.in_(include_ids)
+                )
+            )
+        )
+    if exclude_ids:
+        query = query.filter(
+            ~models.Transaction.id.in_(
+                db.query(models.TransactionCategory.transaction_id).filter(
+                    models.TransactionCategory.category_id.in_(exclude_ids)
+                )
+            )
+        )
+    return query
+
+
 def _dedupe(ids: list[uuid.UUID]) -> list[uuid.UUID]:
     seen = set()
     out = []
@@ -198,7 +228,8 @@ def list_transactions(
     db: DbSession,
     from_: dt.date | None = Query(default=None, alias="from"),
     to: dt.date | None = None,
-    category_id: uuid.UUID | None = None,
+    category_ids: list[uuid.UUID] = Query(default=[]),
+    exclude_category_ids: list[uuid.UUID] = Query(default=[]),
     payment_method_id: uuid.UUID | None = None,
     paid_by: uuid.UUID | None = None,
     type: str | None = None,
@@ -213,14 +244,7 @@ def list_transactions(
         query = query.filter(models.Transaction.occurred_on >= from_)
     if to is not None:
         query = query.filter(models.Transaction.occurred_on <= to)
-    if category_id is not None:
-        query = query.filter(
-            models.Transaction.id.in_(
-                db.query(models.TransactionCategory.transaction_id).filter(
-                    models.TransactionCategory.category_id == category_id
-                )
-            )
-        )
+    query = apply_category_filters(db, query, space_id, category_ids, exclude_category_ids)
     if payment_method_id is not None:
         query = query.filter(models.Transaction.payment_method_id == payment_method_id)
     if paid_by is not None:

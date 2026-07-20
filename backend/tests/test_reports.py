@@ -131,7 +131,7 @@ def test_reports_filtered_by_category(client, make_client):
 
     s = client.get(
         f"/api/spaces/{space['id']}/reports/summary",
-        params={"month": "2026-07", "category_id": g},
+        params={"month": "2026-07", "category_ids": [g]},
     ).json()
     assert s["expense_total"] == 230
     assert s["income_total"] == 0  # incomes carry no category
@@ -143,13 +143,13 @@ def test_reports_filtered_by_category(client, make_client):
 
     members = client.get(
         f"/api/spaces/{space['id']}/reports/by-member",
-        params={"from": "2026-07-01", "to": "2026-07-31", "category_id": g},
+        params={"from": "2026-07-01", "to": "2026-07-31", "category_ids": [g]},
     ).json()
     assert {m["display_name"]: m["total"] for m in members} == {"Ana": 180, "Bob": 50}
 
     monthly = client.get(
         f"/api/spaces/{space['id']}/reports/monthly",
-        params={"months": 4, "end": "2026-07", "category_id": g},
+        params={"months": 4, "end": "2026-07", "category_ids": [g]},
     ).json()
     assert {m["month"]: m["total"] for m in monthly} == {
         "2026-07": 230,
@@ -161,7 +161,7 @@ def test_reports_filtered_by_category(client, make_client):
     # by-category with the filter: matching records grouped by MAIN category
     rows = client.get(
         f"/api/spaces/{space['id']}/reports/by-category",
-        params={"from": "2026-07-01", "to": "2026-07-31", "category_id": g},
+        params={"from": "2026-07-01", "to": "2026-07-31", "category_ids": [g]},
     ).json()
     assert {r["name"]: r["total"] for r in rows} == {"Groceries": 150, "Dining": 80}
 
@@ -179,6 +179,6 @@ def test_report_category_filter_foreign_422(client, make_client):
     foreign_cat = c3.get(f"/api/spaces/{space2['id']}/categories").json()[0]["id"]
     r = client.get(
         f"/api/spaces/{space['id']}/reports/summary",
-        params={"month": "2026-07", "category_id": foreign_cat},
+        params={"month": "2026-07", "category_ids": [foreign_cat]},
     )
     assert r.status_code == 422
