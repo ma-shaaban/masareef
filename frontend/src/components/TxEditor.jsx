@@ -1,26 +1,24 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { todayISO } from '../format.js'
-import TagPicker from './TagPicker.jsx'
+import CategoryChips from './CategoryChips.jsx'
 
 export default function TxEditor({
   tx,
   categories,
   members,
   paymentMethods,
-  spaceTags,
   onSaved,
   onDeleted,
   onClose,
 }) {
   const [amount, setAmount] = useState(String(tx.amount))
   const [type, setType] = useState(tx.type)
-  const [categoryId, setCategoryId] = useState(tx.category?.id || '')
+  const [categoryIds, setCategoryIds] = useState(tx.categories.map((c) => c.id))
   const [date, setDate] = useState(tx.occurred_on)
   const [pmId, setPmId] = useState(tx.payment_method?.id || '')
   const [paidBy, setPaidBy] = useState(tx.paid_by || '')
   const [description, setDescription] = useState(tx.description)
-  const [tags, setTags] = useState(tx.tags.map((t) => t.name))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -39,11 +37,10 @@ export default function TxEditor({
           amount: Math.round(parsed * 100) / 100,
           type,
           occurred_on: date,
-          category_id: categoryId || null,
+          category_ids: categoryIds,
           payment_method_id: pmId || null,
           paid_by: paidBy || null,
           description: description.trim(),
-          tags,
         },
       })
       onSaved(updated)
@@ -88,32 +85,19 @@ export default function TxEditor({
               </select>
             </div>
           </div>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="edit-category">Category</label>
-              <select
-                id="edit-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-              >
-                <option value="">No category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.emoji} {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="edit-date">Date</label>
-              <input
-                id="edit-date"
-                type="date"
-                value={date}
-                max={todayISO()}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
-              />
-            </div>
+          <div className="field">
+            <label>Categories (first = main)</label>
+            <CategoryChips categories={categories} value={categoryIds} onChange={setCategoryIds} />
+          </div>
+          <div className="field">
+            <label htmlFor="edit-date">Date</label>
+            <input
+              id="edit-date"
+              type="date"
+              value={date}
+              max={todayISO()}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+            />
           </div>
           <div className="row">
             <div className="field">
@@ -147,10 +131,6 @@ export default function TxEditor({
               onChange={(e) => setDescription(e.target.value)}
               maxLength={500}
             />
-          </div>
-          <div className="field">
-            <label>Tags</label>
-            <TagPicker suggestions={spaceTags} value={tags} onChange={setTags} />
           </div>
           {error && <p className="error">{error}</p>}
           <div className="actions">

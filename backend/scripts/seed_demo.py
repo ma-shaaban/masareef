@@ -78,17 +78,21 @@ def main() -> None:
             for name, per_week, lo, hi in PROFILE:
                 if rng.random() < per_week / 7:
                     amount = Decimal(rng.randint(lo, hi))
+                    tx = models.Transaction(
+                        space_id=space.id,
+                        type="expense",
+                        amount=amount,
+                        occurred_on=day,
+                        payment_method_id=pms[rng.choice(PAYMENT_WEIGHTS)],
+                        paid_by=user.id,
+                        created_by=user.id,
+                        description="",
+                    )
+                    db.add(tx)
+                    db.flush()
                     db.add(
-                        models.Transaction(
-                            space_id=space.id,
-                            type="expense",
-                            amount=amount,
-                            occurred_on=day,
-                            category_id=cats[name],
-                            payment_method_id=pms[rng.choice(PAYMENT_WEIGHTS)],
-                            paid_by=user.id,
-                            created_by=user.id,
-                            description="",
+                        models.TransactionCategory(
+                            transaction_id=tx.id, category_id=cats[name], position=0
                         )
                     )
                     count += 1

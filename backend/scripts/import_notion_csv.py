@@ -10,9 +10,10 @@ Input: Notion → ••• → Export → CSV of the expenses DB. Expected colu
 
 Mapping — grounded in the real DB's tag audit (2,907 rows, 2026-07-20):
 - The Tags multi-select mixes categories, payment cards, and modifiers.
-  Category-ish tags become categories (first one wins; the rest become
-  plain tags). Card tags become payment methods. Everything else (OneTime,
-  SAR, unknown future tags) becomes a plain tag.
+  Card tags become payment methods. Every other tag becomes a CATEGORY on
+  the record (unified model, v1.2): known category tags first (with their
+  emoji/colors), then modifiers (OneTime ⭐, SAR 🇸🇦, unknown 🏷️). The
+  first category is the record's MAIN one (drives the charts).
 - Rows with no payment tag default to the space's "Cash" method (created
   if missing). SAR-tagged rows keep their numeric amount — the tag marks
   that the original was priced in Saudi riyal.
@@ -33,7 +34,6 @@ from sqlalchemy.orm import sessionmaker
 
 from app import models
 from app.db import get_engine
-from app.services.tags import upsert_tags
 
 # tag in Notion → (category name, emoji, color)
 CATEGORY_TAG_MAP = {
@@ -51,6 +51,12 @@ CATEGORY_TAG_MAP = {
 PAYMENT_TAG_MAP = {
     "Credit QNB": ("Credit QNB", "💳"),
     "Credit CIB": ("Credit CIB", "💳"),
+}
+
+# modifier tags → category look; anything unknown falls back to 🏷️
+MODIFIER_TAG_MAP = {
+    "OneTime": ("OneTime", "⭐", "#f2b134"),
+    "SAR": ("SAR", "🇸🇦", "#2a9d8f"),
 }
 
 DEFAULT_PAYMENT_NAME = "Cash"
@@ -88,8 +94,8 @@ def parse_price(raw: str) -> Decimal | None:
     return value if value > 0 else None
 
 
-def _get_or_create_category(db, space_id, cache: dict, tag: str):
-    name, emoji, color = CATEGORY_TAG_MAP[tag]
+def _get_or_create_category(db, space_id, cache: dict, spec: tuple):
+    name, emoji, color = spec
     key = name.lower()
     if key not in cache:
         top = (
@@ -137,7 +143,7 @@ def import_csv(db, rows, user: models.User, space: models.Space, dry_run: bool =
         p.name.lower(): p
         for p in db.query(models.PaymentMethod).filter(models.PaymentMethod.space_id == space.id)
     }
-    stats = {"imported": 0, "skipped_no_price": 0, "skipped_no_date": 0, "tagged": 0}
+    stats = {"imported": 0, "skipped_no_price": 0, "skipped_no_date": 0, "multi_category": 0}
 
     for row in rows:
         price = parse_price(row.get("Price", ""))
@@ -150,20 +156,17 @@ def import_csv(db, rows, user: models.User, space: models.Space, dry_run: bool =
             continue
         raw_tags = [t.strip() for t in (row.get("Tags") or "").split(",") if t.strip()]
 
-        category = None
         pm = None
-        plain_tags: list[str] = []
+        main_specs: list[tuple] = []   # known category tags, in order
+        extra_specs: list[tuple] = []  # modifiers/unknown tags, in order
         for tag in raw_tags:
             if tag in CATEGORY_TAG_MAP:
-                if category is None:
-                    category = _get_or_create_category(db, space.id, cat_cache, tag)
-                else:
-                    plain_tags.append(CATEGORY_TAG_MAP[tag][0])
+                main_specs.append(CATEGORY_TAG_MAP[tag])
             elif tag in PAYMENT_TAG_MAP:
                 name, icon = PAYMENT_TAG_MAP[tag]
                 pm = _get_or_create_pm(db, space.id, pm_cache, name, icon)
             else:
-                plain_tags.append(tag)
+                extra_specs.append(MODIFIER_TAG_MAP.get(tag, (tag, "🏷️", "#8a8f98")))
         if pm is None:
             pm = _get_or_create_pm(db, space.id, pm_cache, DEFAULT_PAYMENT_NAME, "💵")
 
@@ -172,7 +175,6 @@ def import_csv(db, rows, user: models.User, space: models.Space, dry_run: bool =
             type="expense",
             amount=price,
             occurred_on=date,
-            category_id=category.id if category else None,
             payment_method_id=pm.id,
             paid_by=user.id,
             description=(row.get("Name") or "").strip(),
@@ -180,10 +182,21 @@ def import_csv(db, rows, user: models.User, space: models.Space, dry_run: bool =
         )
         db.add(tx)
         db.flush()
-        if plain_tags:
-            for tag_obj in upsert_tags(db, space.id, plain_tags):
-                db.add(models.TransactionTag(transaction_id=tx.id, tag_id=tag_obj.id))
-            stats["tagged"] += 1
+        seen_cat_ids = set()
+        position = 0
+        for spec in main_specs + extra_specs:
+            category = _get_or_create_category(db, space.id, cat_cache, spec)
+            if category.id in seen_cat_ids:
+                continue
+            seen_cat_ids.add(category.id)
+            db.add(
+                models.TransactionCategory(
+                    transaction_id=tx.id, category_id=category.id, position=position
+                )
+            )
+            position += 1
+        if position > 1:
+            stats["multi_category"] += 1
         stats["imported"] += 1
 
     if dry_run:

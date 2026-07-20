@@ -27,9 +27,8 @@ def test_create_minimal_defaults(client):
     assert tx["payment_method"]["name"] == "Cash"  # space's first method
     assert tx["occurred_on"] == dt.date.today().isoformat()
     assert tx["paid_by"] == u["id"]
-    assert tx["category"] is None
+    assert tx["categories"] == []
     assert tx["description"] == ""
-    assert tx["tags"] == []
 
 
 def test_create_full(client):
@@ -41,14 +40,14 @@ def test_create_full(client):
         amount=200,
         type="income",
         occurred_on="2026-07-01",
-        category_id=cats["Other"]["id"],
+        category_ids=[cats["Other"]["id"]],
         payment_method_id=pms["Bank"]["id"],
         description="salary bits",
     )
     assert r.status_code == 201
     tx = r.json()
     assert tx["type"] == "income"
-    assert tx["category"]["name"] == "Other"
+    assert tx["categories"][0]["name"] == "Other"
     assert tx["payment_method"]["name"] == "Bank"
     assert tx["paid_by_name"] == "Ana"
 
@@ -74,7 +73,7 @@ def test_foreign_category_422(client, make_client):
     _, space, _ = setup_space(client)
     c2 = make_client()
     _, space2, cats2 = setup_space(c2, "bob@example.com", "Bob")
-    r = add_tx(client, space["id"], amount=10, category_id=cats2["Other"]["id"])
+    r = add_tx(client, space["id"], amount=10, category_ids=[cats2["Other"]["id"]])
     assert r.status_code == 422
 
 
@@ -89,11 +88,11 @@ def test_paid_by_must_be_member(client, make_client):
 def test_list_filters_and_pagination(client):
     _, space, cats = setup_space(client)
     add_tx(client, space["id"], amount=10, occurred_on="2026-07-01",
-           category_id=cats["Groceries"]["id"], description="market run")
+           category_ids=[cats["Groceries"]["id"]], description="market run")
     add_tx(client, space["id"], amount=20, occurred_on="2026-07-05",
-           category_id=cats["Dining"]["id"])
+           category_ids=[cats["Dining"]["id"]])
     add_tx(client, space["id"], amount=30, occurred_on="2026-06-20",
-           category_id=cats["Groceries"]["id"])
+           category_ids=[cats["Groceries"]["id"]])
     add_tx(client, space["id"], amount=99, occurred_on="2026-07-03", type="income")
 
     r = client.get(f"/api/spaces/{space['id']}/transactions")
@@ -155,11 +154,11 @@ def test_patch_and_delete(client):
     tx = add_tx(client, space["id"], amount=10).json()
     r = client.patch(
         f"/api/transactions/{tx['id']}",
-        json={"amount": 42.25, "category_id": cats["Health"]["id"], "description": "meds"},
+        json={"amount": 42.25, "category_ids": [cats["Health"]["id"]], "description": "meds"},
     )
     assert r.status_code == 200
     assert r.json()["amount"] == 42.25
-    assert r.json()["category"]["name"] == "Health"
+    assert r.json()["categories"][0]["name"] == "Health"
     assert client.delete(f"/api/transactions/{tx['id']}").status_code == 204
     assert client.get(f"/api/spaces/{space['id']}/transactions").json()["total"] == 0
 
@@ -176,7 +175,7 @@ def test_cross_space_isolation(client, make_client):
 
 def test_category_delete_in_use_409(client):
     _, space, cats = setup_space(client)
-    add_tx(client, space["id"], amount=10, category_id=cats["Groceries"]["id"])
+    add_tx(client, space["id"], amount=10, category_ids=[cats["Groceries"]["id"]])
     r = client.delete(f"/api/categories/{cats['Groceries']['id']}")
     assert r.status_code == 409
     # archiving still works

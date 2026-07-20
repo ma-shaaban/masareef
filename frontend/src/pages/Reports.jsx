@@ -34,6 +34,8 @@ export default function Reports() {
   const { space } = useSpace()
   const [preset, setPreset] = useState('month')
   const [month, setMonth] = useState(thisMonth())
+  const [categories, setCategories] = useState([])
+  const [categoryId, setCategoryId] = useState('')
   const [summary, setSummary] = useState(null)
   const [byCategory, setByCategory] = useState([])
   const [byMember, setByMember] = useState([])
@@ -43,15 +45,23 @@ export default function Reports() {
   const { from, to } = rangeFor(preset, month)
 
   useEffect(() => {
+    api(`/api/spaces/${space.id}/categories?include_archived=1`)
+      .then(setCategories)
+      .catch(() => {})
+    setCategoryId('')
+  }, [space.id])
+
+  useEffect(() => {
     setError('')
+    const cat = categoryId ? `&category_id=${categoryId}` : ''
     const params = new URLSearchParams({ from, to })
     Promise.all([
       preset === 'month'
-        ? api(`/api/spaces/${space.id}/reports/summary?month=${month}`)
+        ? api(`/api/spaces/${space.id}/reports/summary?month=${month}${cat}`)
         : Promise.resolve(null),
-      api(`/api/spaces/${space.id}/reports/by-category?${params}`),
-      api(`/api/spaces/${space.id}/reports/by-member?${params}`),
-      api(`/api/spaces/${space.id}/reports/monthly?months=12`),
+      api(`/api/spaces/${space.id}/reports/by-category?${params}${cat}`),
+      api(`/api/spaces/${space.id}/reports/by-member?${params}${cat}`),
+      api(`/api/spaces/${space.id}/reports/monthly?months=12${cat}`),
     ])
       .then(([s, cats, mems, months]) => {
         setSummary(s)
@@ -60,7 +70,7 @@ export default function Reports() {
         setMonthly(months)
       })
       .catch((err) => setError(err.message))
-  }, [space.id, preset, month, from, to])
+  }, [space.id, preset, month, from, to, categoryId])
 
   const money = (n) => fmtMoney(n, space.currency)
   const rangeTotal = byCategory.reduce((sum, c) => sum + c.total, 0)
@@ -107,6 +117,21 @@ export default function Reports() {
           </button>
         </div>
       )}
+
+      <div className="field">
+        <select
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          aria-label="Filter by category"
+        >
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.emoji} {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {error && <p className="error">{error}</p>}
 
