@@ -1,0 +1,40 @@
+# Backstage catalog stub — picked up by the platform portal's catalog
+# discovery. init.sh fills the placeholders.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: masareef
+  description: FastAPI + React app on the nezam platform
+  annotations:
+    # CI/CD tab: surfaces this repo's GitHub Actions runs in Backstage.
+    github.com/project-slug: ma-shaaban/masareef
+    # Docs tab: render this repo's TechDocs (mkdocs.yml + docs/) inline.
+    backstage.io/techdocs-ref: dir:.
+    # Backstage Kubernetes plugin (027): matches the kubernetes-id annotation on
+    # the base Deployment + Service so the portal surfaces pod/replica status.
+    backstage.io/kubernetes-id: masareef
+    # Template provenance (platform ticket 036): which template + version this
+    # app was scaffolded from. The portal catalog queries these; the AGENTS.md
+    # upgrade skill reads template-version as the app's current level.
+    # The version value below is filled from the template's VERSION file by
+    # scripts/init.sh (or the portal scaffolder), which then DELETES VERSION —
+    # this annotation is the app's only record.
+    nezam.space/template-repo: nezam-org/template-fastapi-react
+    nezam.space/template-version: v1.1.0
+  links:
+    # "Release to Production" button (ticket 038): opens the release workflow's
+    # Run-workflow page — pick a bump, run, prod deploys (see
+    # .github/workflows/release.yaml).
+    - url: https://github.com/ma-shaaban/masareef/actions/workflows/release.yaml
+      title: Release to Production
+      icon: cloud
+    - url: https://masareef-staging.nezam.site
+      title: Staging
+      icon: web
+    - url: https://masareef.nezam.site
+      title: Production
+      icon: web
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ma-shaaban
