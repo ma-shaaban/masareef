@@ -1,6 +1,10 @@
 # What is masareef?
 
-Welcome! **masareef** is your app, running on the Nezam platform.
+Welcome! **Masareef** (مصاريف) is your shared expense tracker, running on the
+Nezam platform. Add an expense from your phone in seconds, browse the
+history month by month, and see where the money goes in chart reports.
+Invite your partner (or coworkers) into your "space" so you track together;
+install it from Chrome like a normal app.
 
 You don't have to manage servers, set up hosting, or configure anything by
 hand — the platform takes care of running it, keeping it online, and shipping

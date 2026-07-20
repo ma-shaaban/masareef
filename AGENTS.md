@@ -43,15 +43,34 @@ scripts/
   release.sh            cut a prod release (X.Y.Z)
 ```
 
-## Current API routes (`backend/app/main.py`)
+## Current API surface
 
-- `GET /api/hello` — static JSON greeting.
-- `GET /api/db-check` — round-trips `SELECT now()` against Postgres; returns
-  503 if the DB is unreachable (never leaks raw error text to the client).
-- `GET /api/version` — reports `APP_VERSION` (baked into the image at build).
-- `GET /healthz` — readiness; deliberately DB-free.
+Feature routers live in `backend/app/routers/` (auth, spaces, categories,
+transactions, reports), registered in `app/main.py` **above** the SPA
+catch-all. Shared deps in `app/deps.py` (`CurrentUser`, `DbSession`),
+security helpers (argon2, cookie sessions, login rate limiting) in
+`app/security.py`, ORM models in `app/models.py`, per-space seed data in
+`app/services/seeds.py`. Schema = alembic migrations `0001`–`0004`
+(app_meta, auth, spaces/invites/categories, transactions).
+`backend/scripts/seed_demo.py` seeds a demo user with 6 months of data
+(`demo@masareef.app` / `demo1234`) — local/staging only, NEVER prod.
+
+Design spec: `docs/superpowers/specs/2026-07-20-masareef-expense-tracker-design.md`.
+
+Template basics still present in `app/main.py`:
+
+- `GET /api/hello`, `GET /api/db-check` (503 when DB unreachable),
+  `GET /api/version` (build-baked `APP_VERSION`), `GET /healthz` (DB-free).
 - `GET /{full_path:path}` — SPA catch-all, registered **last** so every
   `/api/*` and `/healthz` route wins. Keep new API routes above it.
+
+Frontend: react-router v8 routes in `src/App.jsx` (Add `/`, History,
+Reports (lazy — recharts), Settings, Invite), auth context `src/auth.jsx`,
+space context `src/spaces.jsx`, fetch wrapper `src/api.js`, money/date
+helpers `src/format.js`, plain-CSS tokens `src/styles.css`. PWA =
+`public/manifest.webmanifest` + hand-rolled `public/sw.js` (network-first
+navigations, cache-first assets, `/api/*` passthrough) + icons regenerated
+by `scripts/gen-icons.sh`.
 
 ## How deploys work — GET THIS RIGHT
 
@@ -244,10 +263,26 @@ Or build the real image the way the platform does:
 docker build -t masareef . && docker run -p 8080:8080 masareef
 ```
 
-**Tests:** none exist yet. When you add them, prefer `pytest` for the backend
-(add `pytest` to `backend/requirements.txt`, tests under `backend/tests/`) and
-Vitest for the frontend, and wire them into `.github/workflows/ci.yaml` if you
-want CI to run them.
+**Tests:** backend pytest (`backend/tests/`, real Postgres) + frontend
+Vitest. CI runs both in a `test` job (Postgres service container) that gates
+the image build. Test deps live in `backend/requirements-dev.txt` — NOT in
+`requirements.txt` (they must not ship in the runtime image). Local loop:
+
+```sh
+# One-time: local test Postgres on :5435 (conftest defaults point at it;
+# 5433/5434 are taken by sibling apps on this machine)
+docker run -d --name masareef-test-pg -p 5435:5432 -e POSTGRES_USER=masareef \
+  -e POSTGRES_PASSWORD=test -e POSTGRES_DB=masareef_test postgres:16-alpine
+
+# One-time: venv at the repo root
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python \
+  -r backend/requirements.txt -r backend/requirements-dev.txt
+
+# Every change
+cd backend && ../.venv/bin/python -m pytest -q
+cd frontend && npm run test -- --run && npm run build
+```
 
 ## Developing with AI (the loop, for you the agent)
 

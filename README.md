@@ -1,25 +1,26 @@
-# template-fastapi-react
+# masareef
 
-Batteries-included app template for the nezam platform: React (Vite) frontend
-+ FastAPI backend, shipped as **one image**, deployed by Flux to
-`https://<app>-staging.nezam.site` and `https://<app>.nezam.site`.
+**Masareef** (مصاريف) is a shared expense tracker: add a record from your
+phone in seconds, browse history, and see where the money goes in chart
+reports. Built for a household (and general enough for a small shop or
+company), multi-user via invited "spaces", installable as a PWA from Chrome.
 
-## Start here
+Runs on the Nezam platform: React (Vite) frontend + FastAPI backend shipped
+as **one image**, deployed by Flux to
+`https://masareef-staging.nezam.site` and `https://masareef.nezam.site`.
 
-1. Click **"Use this template"** on GitHub (or plain clone-and-copy — nothing
-   here is GitHub-specific except the CI workflow).
-2. From your new repo's root:
+Highlights:
 
-   ```sh
-   ./scripts/init.sh <your-github-user> <app-name>   # lowercase alnum/dash
-   git push
-   ```
-
-3. Ask the platform to register the app (namespaces, Flux sync, DB role — see
-   the platform runbook *"Register a tenant app"*).
-4. After CI's first push, make the `ghcr.io/<user>/<app>` package **public**
-   (GitHub → your profile → Packages → package settings → Change visibility).
-   One-time step.
+- **Quick add** — amount, category chip, done. Defaults for date, payer, and
+  payment method.
+- **History** — month-by-month, day-grouped, filter by category/member/type,
+  edit or delete any record.
+- **Reports** — monthly summary vs. last month, category donut, daily bars,
+  12-month trend, who-paid split. Aggregation runs in Postgres.
+- **Spaces** — invite your partner via a link; every space has its own
+  categories, currency, and members.
+- **PWA** — install from Chrome (⋮ → *Install app*); app-shell cached for
+  fast loads.
 
 ## How your app ships
 
@@ -100,8 +101,8 @@ Label a same-repo PR `preview` to spin up an ephemeral environment at
 
 | Path | What |
 |---|---|
-| `frontend/` | Vite + React SPA (one demo page hitting the API) |
-| `backend/` | FastAPI: `/api/hello`, `/api/db-check`, `/api/version`, `/healthz`; serves the built SPA at `/` |
+| `frontend/` | Vite + React SPA: quick-add, history, reports (Recharts), settings; PWA assets in `public/` |
+| `backend/` | FastAPI: auth, spaces, categories, transactions, reports under `/api/*`; serves the built SPA at `/` |
 | `deploy/` | kustomize base + staging/prod/preview overlays (Deployment, Service, HTTPRoute) |
 | `Dockerfile` | multi-stage: node build → python:3.12-slim runtime |
 | `.github/workflows/ci.yaml` | build+push image; staging writeback on main; release build on `v*` tags; preview build on labeled PRs |
@@ -122,7 +123,24 @@ cd backend && pip install -r requirements.txt && uvicorn app.main:app --port 808
 cd frontend && npm install && npm run dev
 ```
 
-Or the real thing: `docker build -t myapp . && docker run -p 8080:8080 myapp`.
+Or the real thing: `docker build -t masareef . && docker run -p 8080:8080 masareef`.
+
+### Tests
+
+```sh
+# one-time: throwaway test Postgres on :5435
+docker run -d --name masareef-test-pg -p 5435:5432 -e POSTGRES_USER=masareef \
+  -e POSTGRES_PASSWORD=test -e POSTGRES_DB=masareef_test postgres:16-alpine
+
+# backend (from backend/): pytest against the real DB
+cd backend && python -m pytest -q
+
+# frontend
+cd frontend && npm run test -- --run
+```
+
+Demo data for a local look around: `cd backend && python -m scripts.seed_demo`
+(user `demo@masareef.app` / `demo1234`).
 
 ## Template versioning (for template maintainers)
 

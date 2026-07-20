@@ -11,9 +11,17 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.routers import auth, categories, reports, spaces, transactions
+
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="fastapi-react-app")
+app = FastAPI(title="masareef")
+
+app.include_router(auth.router)
+app.include_router(spaces.router)
+app.include_router(categories.router)
+app.include_router(transactions.router)
+app.include_router(reports.router)
 
 
 def _db_conninfo() -> dict:

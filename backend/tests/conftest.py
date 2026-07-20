@@ -1,0 +1,86 @@
+"""Test fixtures: real Postgres (docker locally, service container in CI).
+
+Env contract: TEST_DB_HOST/TEST_DB_PORT point at a throwaway Postgres
+(user masareef / pass test / db masareef_test); defaults match
+`docker run -d --name masareef-test-pg -e POSTGRES_USER=masareef \
+ -e POSTGRES_PASSWORD=test -e POSTGRES_DB=masareef_test -p 5435:5432 postgres:16-alpine`.
+The DB_* vars the app reads are overwritten before the app is imported.
+"""
+
+import os
+from pathlib import Path
+
+import pytest
+
+os.environ["DB_HOST"] = os.environ.get("TEST_DB_HOST", "localhost")
+os.environ["DB_PORT"] = os.environ.get("TEST_DB_PORT", "5435")
+os.environ["DB_NAME"] = "masareef_test"
+os.environ["DB_USER"] = "masareef"
+os.environ["DB_PASSWORD"] = "test"
+
+import sqlalchemy as sa
+from alembic import command
+from alembic.config import Config
+
+_TEST_ENGINE = None
+
+
+def test_engine():
+    global _TEST_ENGINE
+    if _TEST_ENGINE is None:
+        _TEST_ENGINE = sa.create_engine(
+            "postgresql+psycopg://masareef:test@"
+            f"{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/masareef_test"
+        )
+    return _TEST_ENGINE
+
+
+@pytest.fixture(scope="session", autouse=True)
+def migrated_db():
+    cfg = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+    command.upgrade(cfg, "head")
+    yield
+
+
+@pytest.fixture()
+def client(migrated_db):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture()
+def make_client(migrated_db):
+    """Extra clients with independent cookie jars — for multi-user tests."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    clients = []
+
+    def _make():
+        c = TestClient(app)
+        c.__enter__()
+        clients.append(c)
+        return c
+
+    yield _make
+    for c in clients:
+        c.__exit__(None, None, None)
+
+
+@pytest.fixture(autouse=True)
+def clean_tables(migrated_db):
+    yield
+    with test_engine().begin() as conn:
+        rows = conn.execute(
+            sa.text(
+                "SELECT tablename FROM pg_tables WHERE schemaname='public' "
+                "AND tablename NOT IN ('alembic_version', 'app_meta')"
+            )
+        ).scalars().all()
+        if rows:
+            conn.execute(sa.text("TRUNCATE " + ", ".join(f'"{t}"' for t in rows) + " CASCADE"))
