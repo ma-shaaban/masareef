@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import CategoryManager from '../components/CategoryManager.jsx'
+import PaymentMethodManager from '../components/PaymentMethodManager.jsx'
 import CreateSpace from './CreateSpace.jsx'
 import { useSpace } from '../spaces.jsx'
 
@@ -15,6 +16,7 @@ export default function Settings() {
   const [members, setMembers] = useState([])
   const [invites, setInvites] = useState([])
   const [categories, setCategories] = useState([])
+  const [paymentMethods, setPaymentMethods] = useState([])
   const [showNewSpace, setShowNewSpace] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
@@ -22,6 +24,9 @@ export default function Settings() {
   const loadSpaceData = useCallback(() => {
     api(`/api/spaces/${space.id}/members`).then(setMembers).catch(() => {})
     api(`/api/spaces/${space.id}/invites`).then(setInvites).catch(() => {})
+    api(`/api/spaces/${space.id}/payment-methods?include_archived=1`)
+      .then(setPaymentMethods)
+      .catch(() => {})
     api(`/api/spaces/${space.id}/categories?include_archived=1`)
       .then(setCategories)
       .catch(() => {})
@@ -230,6 +235,13 @@ export default function Settings() {
 
       <div className="section-title">Categories</div>
       <CategoryManager spaceId={space.id} categories={categories} onChanged={loadSpaceData} />
+
+      <div className="section-title">Payment methods</div>
+      <PaymentMethodManager
+        spaceId={space.id}
+        paymentMethods={paymentMethods}
+        onChanged={loadSpaceData}
+      />
 
       <div className="section-title">Account</div>
       <button type="button" className="btn danger block" onClick={logout}>

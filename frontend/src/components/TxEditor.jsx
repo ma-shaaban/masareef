@@ -1,23 +1,26 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { todayISO } from '../format.js'
+import TagPicker from './TagPicker.jsx'
 
-const PAYMENT_METHODS = [
-  ['cash', 'Cash'],
-  ['card', 'Card'],
-  ['wallet', 'Wallet'],
-  ['bank', 'Bank'],
-  ['other', 'Other'],
-]
-
-export default function TxEditor({ tx, categories, members, onSaved, onDeleted, onClose }) {
+export default function TxEditor({
+  tx,
+  categories,
+  members,
+  paymentMethods,
+  spaceTags,
+  onSaved,
+  onDeleted,
+  onClose,
+}) {
   const [amount, setAmount] = useState(String(tx.amount))
   const [type, setType] = useState(tx.type)
   const [categoryId, setCategoryId] = useState(tx.category?.id || '')
   const [date, setDate] = useState(tx.occurred_on)
-  const [pm, setPm] = useState(tx.payment_method)
+  const [pmId, setPmId] = useState(tx.payment_method?.id || '')
   const [paidBy, setPaidBy] = useState(tx.paid_by || '')
   const [description, setDescription] = useState(tx.description)
+  const [tags, setTags] = useState(tx.tags.map((t) => t.name))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -37,9 +40,10 @@ export default function TxEditor({ tx, categories, members, onSaved, onDeleted, 
           type,
           occurred_on: date,
           category_id: categoryId || null,
-          payment_method: pm,
+          payment_method_id: pmId || null,
           paid_by: paidBy || null,
           description: description.trim(),
+          tags,
         },
       })
       onSaved(updated)
@@ -114,10 +118,11 @@ export default function TxEditor({ tx, categories, members, onSaved, onDeleted, 
           <div className="row">
             <div className="field">
               <label htmlFor="edit-pm">Payment</label>
-              <select id="edit-pm" value={pm} onChange={(e) => setPm(e.target.value)}>
-                {PAYMENT_METHODS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+              <select id="edit-pm" value={pmId} onChange={(e) => setPmId(e.target.value)}>
+                <option value="">—</option>
+                {paymentMethods.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.icon} {p.name}
                   </option>
                 ))}
               </select>
@@ -137,10 +142,15 @@ export default function TxEditor({ tx, categories, members, onSaved, onDeleted, 
             <label htmlFor="edit-note">Note</label>
             <input
               id="edit-note"
+              dir="auto"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={500}
             />
+          </div>
+          <div className="field">
+            <label>Tags</label>
+            <TagPicker suggestions={spaceTags} value={tags} onChange={setTags} />
           </div>
           {error && <p className="error">{error}</p>}
           <div className="actions">

@@ -2,17 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import CategoryChips from '../components/CategoryChips.jsx'
+import TagPicker from '../components/TagPicker.jsx'
 import { todayISO } from '../format.js'
 import { useSpace } from '../spaces.jsx'
-
-const PM_KEY = 'masareef.pm'
-const PAYMENT_METHODS = [
-  ['cash', '💵 Cash'],
-  ['card', '💳 Card'],
-  ['wallet', '📱 Wallet'],
-  ['bank', '🏦 Bank'],
-  ['other', '➰ Other'],
-]
 
 function yesterdayISO() {
   const d = new Date()
@@ -27,24 +19,39 @@ export default function Add() {
   const { space } = useSpace()
   const [categories, setCategories] = useState([])
   const [members, setMembers] = useState([])
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [spaceTags, setSpaceTags] = useState([])
   const [amount, setAmount] = useState('')
   const [type, setType] = useState('expense')
   const [categoryId, setCategoryId] = useState(null)
   const [date, setDate] = useState(todayISO())
-  const [pm, setPm] = useState(() => localStorage.getItem(PM_KEY) || 'cash')
+  const [pmId, setPmId] = useState(null)
   const [paidBy, setPaidBy] = useState(user.id)
   const [description, setDescription] = useState('')
+  const [tags, setTags] = useState([])
+  const [showTags, setShowTags] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
   const amountRef = useRef(null)
 
+  const pmKey = `masareef.pm.${space.id}`
+
   useEffect(() => {
     api(`/api/spaces/${space.id}/categories`).then(setCategories).catch(() => {})
     api(`/api/spaces/${space.id}/members`).then(setMembers).catch(() => {})
+    api(`/api/spaces/${space.id}/tags`).then(setSpaceTags).catch(() => {})
+    api(`/api/spaces/${space.id}/payment-methods`)
+      .then((pms) => {
+        setPaymentMethods(pms)
+        const remembered = localStorage.getItem(pmKey)
+        setPmId(pms.some((p) => p.id === remembered) ? remembered : (pms[0]?.id ?? null))
+      })
+      .catch(() => {})
     setCategoryId(null)
+    setTags([])
     setPaidBy(user.id)
-  }, [space.id, user.id])
+  }, [space.id, user.id, pmKey])
 
   const parsed = Number.parseFloat(amount)
   const valid = Number.isFinite(parsed) && parsed > 0
@@ -62,14 +69,19 @@ export default function Add() {
           type,
           occurred_on: date,
           category_id: categoryId,
-          payment_method: pm,
+          payment_method_id: pmId,
           paid_by: paidBy,
           description: description.trim(),
+          tags,
         },
       })
-      localStorage.setItem(PM_KEY, pm)
+      if (pmId) localStorage.setItem(pmKey, pmId)
+      if (tags.length) {
+        api(`/api/spaces/${space.id}/tags`).then(setSpaceTags).catch(() => {})
+      }
       setAmount('')
       setDescription('')
+      setTags([])
       setToast('Saved ✓')
       setTimeout(() => setToast(''), 1800)
       amountRef.current?.focus()
@@ -140,14 +152,14 @@ export default function Add() {
       </div>
 
       <div className="seg" aria-label="Payment method">
-        {PAYMENT_METHODS.map(([value, label]) => (
+        {paymentMethods.map((p) => (
           <button
-            key={value}
+            key={p.id}
             type="button"
-            className={pm === value ? 'active' : ''}
-            onClick={() => setPm(value)}
+            className={pmId === p.id ? 'active' : ''}
+            onClick={() => setPmId(p.id)}
           >
-            {label}
+            {p.icon} {p.name}
           </button>
         ))}
       </div>
@@ -169,6 +181,7 @@ export default function Add() {
         <label htmlFor="description">Note (optional)</label>
         <input
           id="description"
+          dir="auto"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What was it for?"
@@ -176,8 +189,19 @@ export default function Add() {
         />
       </div>
 
+      {showTags ? (
+        <div className="field">
+          <label>Tags</label>
+          <TagPicker suggestions={spaceTags} value={tags} onChange={setTags} />
+        </div>
+      ) : (
+        <button type="button" className="linklike" onClick={() => setShowTags(true)}>
+          🏷️ Add tags
+        </button>
+      )}
+
       {error && <p className="error">{error}</p>}
-      <button className="btn block" disabled={!valid || busy}>
+      <button className="btn block" disabled={!valid || busy} style={{ marginTop: 12 }}>
         Add {type}
       </button>
       {toast && <div className="toast">{toast}</div>}

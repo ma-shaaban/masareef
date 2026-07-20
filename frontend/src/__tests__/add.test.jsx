@@ -14,6 +14,10 @@ const CATEGORIES = [
   { id: 'c2', name: 'Dining', emoji: '🍽️', color: '#e07a5f', sort_order: 1, is_archived: false },
 ]
 const MEMBERS = [{ user_id: 'u1', display_name: 'Ana', email: 'a@x.co', role: 'owner' }]
+const PAYMENT_METHODS = [
+  { id: 'p1', name: 'Cash', icon: '💵', sort_order: 0, is_archived: false },
+  { id: 'p2', name: 'Credit QNB', icon: '💳', sort_order: 1, is_archived: false },
+]
 
 function stubFetch() {
   const calls = []
@@ -21,12 +25,17 @@ function stubFetch() {
     'fetch',
     vi.fn(async (url, opts = {}) => {
       calls.push([url, opts])
+      const u = String(url)
       const body =
         opts.method === 'POST'
           ? { id: 't1' }
-          : String(url).includes('/categories')
+          : u.includes('/categories')
             ? CATEGORIES
-            : MEMBERS
+            : u.includes('/payment-methods')
+              ? PAYMENT_METHODS
+              : u.includes('/tags')
+                ? []
+                : MEMBERS
       return { ok: true, status: opts.method === 'POST' ? 201 : 200, json: async () => body }
     }),
   )
@@ -76,6 +85,8 @@ describe('Add', () => {
     expect(body.type).toBe('expense')
     expect(body.description).toBe('veggies')
     expect(body.paid_by).toBe('u1')
+    expect(body.payment_method_id).toBe('p1') // space's first method by default
+    expect(body.tags).toEqual([])
 
     await waitFor(() => {
       expect(screen.getByLabelText('Amount').value).toBe('')
