@@ -16,7 +16,7 @@ from app.db import get_engine
 from app.services.seeds import seed_categories
 from sqlalchemy.orm import sessionmaker
 
-DEMO_EMAIL = "demo@masareef.local"
+DEMO_EMAIL = "demo@masareef.app"
 DEMO_PASSWORD = "demo1234"
 
 # (category, weekly frequency, min EGP, max EGP)
