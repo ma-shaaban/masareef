@@ -29,14 +29,16 @@ def build_dataset(client, make_client):
     def add(cl, amount, day, cat=None, type_="expense", **kw):
         body = {"amount": amount, "occurred_on": day, "type": type_}
         if cat:
-            body["category_id"] = cats[cat]["id"]
+            names = cat if isinstance(cat, list) else [cat]
+            body["category_ids"] = [cats[n]["id"] for n in names]
         body.update(kw)
         r = cl.post(f"/api/spaces/{space['id']}/transactions", json=body)
         assert r.status_code == 201, r.text
 
     add(client, 100, "2026-07-02", "Groceries")
     add(c2, 50, "2026-07-10", "Groceries")
-    add(client, 80, "2026-07-10", "Dining")
+    # multi-category: Dining is MAIN, Groceries is a secondary label
+    add(client, 80, "2026-07-10", ["Dining", "Groceries"])
     add(client, 20, "2026-07-15")
     add(client, 500, "2026-07-01", None, "income")
     add(client, 200, "2026-06-05", "Groceries")
@@ -119,3 +121,64 @@ def test_reports_non_member_404(client, make_client):
     )
     for path in ("summary?month=2026-07", "by-category", "by-member", "monthly"):
         assert c3.get(f"/api/spaces/{space['id']}/reports/{path}").status_code == 404, path
+
+
+def test_reports_filtered_by_category(client, make_client):
+    """category_id matches ANY position; the Dining-main record carries
+    Groceries as a secondary label, so Groceries-filtered July = 100+50+80."""
+    ana, bob, space, cats = build_dataset(client, make_client)
+    g = cats["Groceries"]["id"]
+
+    s = client.get(
+        f"/api/spaces/{space['id']}/reports/summary",
+        params={"month": "2026-07", "category_id": g},
+    ).json()
+    assert s["expense_total"] == 230
+    assert s["income_total"] == 0  # incomes carry no category
+    assert s["prev_expense_total"] == 200
+    assert {d["date"]: d["total"] for d in s["daily"]} == {
+        "2026-07-02": 100,
+        "2026-07-10": 130,
+    }
+
+    members = client.get(
+        f"/api/spaces/{space['id']}/reports/by-member",
+        params={"from": "2026-07-01", "to": "2026-07-31", "category_id": g},
+    ).json()
+    assert {m["display_name"]: m["total"] for m in members} == {"Ana": 180, "Bob": 50}
+
+    monthly = client.get(
+        f"/api/spaces/{space['id']}/reports/monthly",
+        params={"months": 4, "end": "2026-07", "category_id": g},
+    ).json()
+    assert {m["month"]: m["total"] for m in monthly} == {
+        "2026-07": 230,
+        "2026-06": 200,
+        "2026-05": 0,
+        "2026-04": 0,
+    }
+
+    # by-category with the filter: matching records grouped by MAIN category
+    rows = client.get(
+        f"/api/spaces/{space['id']}/reports/by-category",
+        params={"from": "2026-07-01", "to": "2026-07-31", "category_id": g},
+    ).json()
+    assert {r["name"]: r["total"] for r in rows} == {"Groceries": 150, "Dining": 80}
+
+
+def test_report_category_filter_foreign_422(client, make_client):
+    _, _, space, _ = build_dataset(client, make_client)
+    c3 = make_client()
+    c3.post(
+        "/api/auth/signup",
+        json={"email": "zed@example.com", "password": "sup3rsecret", "display_name": "Zed"},
+    )
+    space2 = c3.post(
+        "/api/spaces", json={"name": "Z", "kind": "shop", "currency": "EGP"}
+    ).json()
+    foreign_cat = c3.get(f"/api/spaces/{space2['id']}/categories").json()[0]["id"]
+    r = client.get(
+        f"/api/spaces/{space['id']}/reports/summary",
+        params={"month": "2026-07", "category_id": foreign_cat},
+    )
+    assert r.status_code == 422

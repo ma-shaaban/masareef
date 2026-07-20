@@ -100,28 +100,17 @@ class PaymentMethod(Base):
     )
 
 
-class Tag(Base):
-    __tablename__ = "tags"
-
-    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid.uuid4)
-    space_id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid, sa.ForeignKey("spaces.id", ondelete="CASCADE"), nullable=False
-    )
-    name: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    is_archived: Mapped[bool] = mapped_column(
-        sa.Boolean, nullable=False, server_default=sa.false()
-    )
-
-
-class TransactionTag(Base):
-    __tablename__ = "transaction_tags"
+class TransactionCategory(Base):
+    __tablename__ = "transaction_categories"
 
     transaction_id: Mapped[uuid.UUID] = mapped_column(
         sa.Uuid, sa.ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True
     )
-    tag_id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid, sa.ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid, sa.ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True
     )
+    # 0 = the record's MAIN category (drives the by-category chart).
+    position: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default="0")
 
 
 class Transaction(Base):
@@ -134,9 +123,6 @@ class Transaction(Base):
     type: Mapped[str] = mapped_column(sa.Text, nullable=False, server_default="expense")
     amount: Mapped[object] = mapped_column(sa.Numeric(14, 2), nullable=False)
     occurred_on: Mapped[object] = mapped_column(sa.Date, nullable=False)
-    category_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.Uuid, sa.ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
-    )
     payment_method_id: Mapped[uuid.UUID | None] = mapped_column(
         sa.Uuid, sa.ForeignKey("payment_methods.id", ondelete="SET NULL"), nullable=True
     )

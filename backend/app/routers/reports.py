@@ -1,17 +1,23 @@
 """Aggregation endpoints for the reports screen. All money aggregation runs
-in Postgres; amounts serialize as floats at the API boundary (display app)."""
+in Postgres; amounts serialize as floats at the API boundary (display app).
+
+Category semantics: each record has an ordered category list. The
+by-category breakdown groups by the MAIN category (position 0) so every
+expense is counted exactly once; the optional `category_id` filter on all
+endpoints matches ANY position (a record labelled Comex+OneTime shows up
+when filtering by either)."""
 
 import datetime as dt
 import re
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import Date, cast, func
+from sqlalchemy import Date, and_, cast, func
 
 from app import models
 from app.deps import CurrentUser, DbSession
 from app.routers.spaces import get_membership
-from app.routers.transactions import TYPES
+from app.routers.transactions import TYPES, validate_category
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
@@ -39,26 +45,43 @@ def _validate_type(type_: str) -> str:
     return type_
 
 
-def _range_total(db, space_id, first, last, type_) -> float:
-    total = (
-        db.query(func.coalesce(func.sum(models.Transaction.amount), 0))
-        .filter(
-            models.Transaction.space_id == space_id,
-            models.Transaction.type == type_,
-            models.Transaction.occurred_on >= first,
-            models.Transaction.occurred_on <= last,
+def _category_filter(db, query, space_id, category_id: uuid.UUID | None):
+    """Restrict to records carrying the category at any position."""
+    if category_id is None:
+        return query
+    validate_category(db, space_id, category_id)
+    return query.filter(
+        models.Transaction.id.in_(
+            db.query(models.TransactionCategory.transaction_id).filter(
+                models.TransactionCategory.category_id == category_id
+            )
         )
-        .scalar()
     )
-    return float(total)
+
+
+def _range_total(db, space_id, first, last, type_, category_id=None) -> float:
+    q = db.query(func.coalesce(func.sum(models.Transaction.amount), 0)).filter(
+        models.Transaction.space_id == space_id,
+        models.Transaction.type == type_,
+        models.Transaction.occurred_on >= first,
+        models.Transaction.occurred_on <= last,
+    )
+    q = _category_filter(db, q, space_id, category_id)
+    return float(q.scalar())
 
 
 @router.get("/spaces/{space_id}/reports/summary")
-def summary(space_id: uuid.UUID, month: str, user: CurrentUser, db: DbSession):
+def summary(
+    space_id: uuid.UUID,
+    month: str,
+    user: CurrentUser,
+    db: DbSession,
+    category_id: uuid.UUID | None = None,
+):
     get_membership(db, space_id, user)
     first, last = _parse_month(month)
     prev_first, prev_last = _prev_month(first)
-    daily_rows = (
+    daily_q = (
         db.query(
             models.Transaction.occurred_on,
             func.sum(models.Transaction.amount),
@@ -69,15 +92,18 @@ def summary(space_id: uuid.UUID, month: str, user: CurrentUser, db: DbSession):
             models.Transaction.occurred_on >= first,
             models.Transaction.occurred_on <= last,
         )
-        .group_by(models.Transaction.occurred_on)
-        .order_by(models.Transaction.occurred_on)
-        .all()
     )
+    daily_q = _category_filter(db, daily_q, space_id, category_id)
+    daily_rows = daily_q.group_by(models.Transaction.occurred_on).order_by(
+        models.Transaction.occurred_on
+    ).all()
     return {
         "month": month,
-        "expense_total": _range_total(db, space_id, first, last, "expense"),
-        "income_total": _range_total(db, space_id, first, last, "income"),
-        "prev_expense_total": _range_total(db, space_id, prev_first, prev_last, "expense"),
+        "expense_total": _range_total(db, space_id, first, last, "expense", category_id),
+        "income_total": _range_total(db, space_id, first, last, "income", category_id),
+        "prev_expense_total": _range_total(
+            db, space_id, prev_first, prev_last, "expense", category_id
+        ),
         "daily": [{"date": d.isoformat(), "total": float(t)} for d, t in daily_rows],
     }
 
@@ -90,9 +116,11 @@ def by_category(
     from_: dt.date | None = Query(default=None, alias="from"),
     to: dt.date | None = None,
     type: str = "expense",
+    category_id: uuid.UUID | None = None,
 ):
     get_membership(db, space_id, user)
     _validate_type(type)
+    # Group by the MAIN category: join only the position-0 row.
     q = (
         db.query(
             models.Category.id,
@@ -103,13 +131,21 @@ def by_category(
             func.count(models.Transaction.id).label("count"),
         )
         .select_from(models.Transaction)
-        .outerjoin(models.Category, models.Category.id == models.Transaction.category_id)
+        .outerjoin(
+            models.TransactionCategory,
+            and_(
+                models.TransactionCategory.transaction_id == models.Transaction.id,
+                models.TransactionCategory.position == 0,
+            ),
+        )
+        .outerjoin(models.Category, models.Category.id == models.TransactionCategory.category_id)
         .filter(models.Transaction.space_id == space_id, models.Transaction.type == type)
     )
     if from_ is not None:
         q = q.filter(models.Transaction.occurred_on >= from_)
     if to is not None:
         q = q.filter(models.Transaction.occurred_on <= to)
+    q = _category_filter(db, q, space_id, category_id)
     rows = (
         q.group_by(
             models.Category.id, models.Category.name, models.Category.emoji, models.Category.color
@@ -140,6 +176,7 @@ def by_member(
     from_: dt.date | None = Query(default=None, alias="from"),
     to: dt.date | None = None,
     type: str = "expense",
+    category_id: uuid.UUID | None = None,
 ):
     get_membership(db, space_id, user)
     _validate_type(type)
@@ -158,6 +195,7 @@ def by_member(
         q = q.filter(models.Transaction.occurred_on >= from_)
     if to is not None:
         q = q.filter(models.Transaction.occurred_on <= to)
+    q = _category_filter(db, q, space_id, category_id)
     rows = (
         q.group_by(models.User.id, models.User.display_name)
         .order_by(func.sum(models.Transaction.amount).desc())
@@ -182,6 +220,7 @@ def monthly(
     months: int = Query(default=12, ge=1, le=36),
     end: str | None = None,
     type: str = "expense",
+    category_id: uuid.UUID | None = None,
 ):
     get_membership(db, space_id, user)
     _validate_type(type)
@@ -197,7 +236,7 @@ def monthly(
     month_keys.reverse()
     start_first = dt.datetime.strptime(month_keys[0], "%Y-%m").date()
 
-    rows = (
+    q = (
         db.query(
             func.to_char(
                 func.date_trunc("month", cast(models.Transaction.occurred_on, Date)), "YYYY-MM"
@@ -210,8 +249,8 @@ def monthly(
             models.Transaction.occurred_on >= start_first,
             models.Transaction.occurred_on <= end_last,
         )
-        .group_by("month")
-        .all()
     )
+    q = _category_filter(db, q, space_id, category_id)
+    rows = q.group_by("month").all()
     totals = {r.month: float(r.total) for r in rows}
     return [{"month": m, "total": totals.get(m, 0.0)} for m in month_keys]

@@ -119,7 +119,9 @@ def patch_category(category_id: uuid.UUID, body: CategoryPatch, user: CurrentUse
 def delete_category(category_id: uuid.UUID, user: CurrentUser, db: DbSession):
     c = _get_category(db, category_id, user)
     in_use = db.query(
-        db.query(models.Transaction).filter(models.Transaction.category_id == c.id).exists()
+        db.query(models.TransactionCategory)
+        .filter(models.TransactionCategory.category_id == c.id)
+        .exists()
     ).scalar()
     if in_use:
         raise HTTPException(status_code=409, detail="Category is in use; archive it instead")

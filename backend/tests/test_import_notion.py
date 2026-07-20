@@ -72,27 +72,25 @@ def test_import_full_flow(client):
     assert txs["total"] == 8
 
     by_desc = {t["description"]: t for t in txs["items"]}
-    # untagged rows: no category, Cash payment
-    assert by_desc["صيدلية"]["category"] is None
+    # untagged rows: no categories, Cash payment
+    assert by_desc["صيدلية"]["categories"] == []
     assert by_desc["صيدلية"]["payment_method"]["name"] == "Cash"
     # thousands separator parsed
     assert by_desc["اوردر نون"]["amount"] == 1113
     # payment tag → payment method; category tag → category
-    assert by_desc["عشاء برة"]["category"]["name"] == "Restaurants & Cafes"
+    assert [c["name"] for c in by_desc["عشاء برة"]["categories"]] == ["Restaurants & Cafes"]
     assert by_desc["عشاء برة"]["payment_method"]["name"] == "Credit QNB"
-    # modifier tag stays a tag
-    assert by_desc["دهب"]["category"]["name"] == "Comex"
-    assert [t["name"] for t in by_desc["دهب"]["tags"]] == ["OneTime"]
-    assert [t["name"] for t in by_desc["قهوة السعودية"]["tags"]] == ["SAR"]
+    # modifier tags become extra categories (main first)
+    assert [c["name"] for c in by_desc["دهب"]["categories"]] == ["Comex", "OneTime"]
+    assert [c["name"] for c in by_desc["قهوة السعودية"]["categories"]] == ["SAR"]
     # future date imported as-is
     assert by_desc["تبرعات"]["occurred_on"] == "2026-08-01"
-    # second category tag demoted to a plain tag
-    assert by_desc["هدية وشحن"]["category"]["name"] == "Gifts"
-    assert [t["name"] for t in by_desc["هدية وشحن"]["tags"]] == ["Food"]
+    # both category tags kept, first one is main
+    assert [c["name"] for c in by_desc["هدية وشحن"]["categories"]] == ["Gifts", "Food"]
 
     # created categories/pms visible in the space lists
     cat_names = {c["name"] for c in client.get(f"/api/spaces/{space_json['id']}/categories").json()}
-    assert {"Restaurants & Cafes", "Comex", "Charity", "Gifts", "Food"} <= cat_names
+    assert {"Restaurants & Cafes", "Comex", "Charity", "Gifts", "Food", "OneTime", "SAR"} <= cat_names
     pm_names = {p["name"] for p in client.get(f"/api/spaces/{space_json['id']}/payment-methods").json()}
     assert {"Credit QNB", "Credit CIB", "Cash"} <= pm_names
 
