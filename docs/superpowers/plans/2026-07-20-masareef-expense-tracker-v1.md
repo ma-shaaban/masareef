@@ -10,7 +10,7 @@
 
 **Reference implementation:** the todo app at `/home/mahmoud/personal/todo` — when a task says "todo pattern", open the named file there and adapt (rename todo→masareef, drop push/reminders). NEVER copy todo-specific business logic.
 
-**Environment facts:** masareef repo = `/home/mahmoud/personal/masareef`, branch `feat/expense-tracker-v1`. Local test Postgres for masareef: port **5434** (todo already owns 5433), container `masareef-test-pg`, user/db `masareef`/`masareef_test`, password `test`. Git commits: use `--no-gpg-sign` (GPG prompts hang in this harness). Staging URL: `https://masareef-staging.nezam.site`.
+**Environment facts:** masareef repo = `/home/mahmoud/personal/masareef`, branch `feat/expense-tracker-v1`. Local test Postgres for masareef: port **5435** (todo already owns 5433), container `masareef-test-pg`, user/db `masareef`/`masareef_test`, password `test`. Git commits: use `--no-gpg-sign` (GPG prompts hang in this harness). Staging URL: `https://masareef-staging.nezam.site`.
 
 ---
 
@@ -18,7 +18,7 @@
 
 **Files:** none (environment only)
 
-- [ ] Start test Postgres: `docker run -d --name masareef-test-pg -p 5434:5432 -e POSTGRES_USER=masareef -e POSTGRES_PASSWORD=test -e POSTGRES_DB=masareef_test postgres:16-alpine` (if name conflict: `docker start masareef-test-pg`)
+- [ ] Start test Postgres: `docker run -d --name masareef-test-pg -p 5435:5432 -e POSTGRES_USER=masareef -e POSTGRES_PASSWORD=test -e POSTGRES_DB=masareef_test postgres:16-alpine` (if name conflict: `docker start masareef-test-pg`)
 - [ ] Create `backend/requirements-dev.txt`: `pytest==8.*`, `httpx` (TestClient dep). Runtime deps to ADD to `backend/requirements.txt`: `argon2-cffi==25.1.0` (verify latest on PyPI at execution).
 - [ ] Venv: `uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r backend/requirements.txt -r backend/requirements-dev.txt`
 - [ ] Frontend deps: `cd frontend && npm install && npm install react-router recharts && npm install -D vitest @testing-library/react jsdom`
@@ -33,10 +33,10 @@
 - Create: `backend/app/security.py` — todo pattern (`/home/mahmoud/personal/todo/backend/app/security.py`): argon2 `PasswordHasher(time_cost=2, memory_cost=19*1024, parallelism=1)` behind a `threading.Semaphore(4)`; `hash_password`/`verify_password` (verify hashes a dummy on unknown email for timing safety); `new_session_token()` = `secrets.token_urlsafe(32)`, stored as sha256 hexdigest; `set_session_cookie(response, token)` HttpOnly SameSite=Lax max_age 30d, `secure=` from env `COOKIE_SECURE` default true off localhost — follow todo's exact approach; rolling refresh when < 15 days left; in-memory login rate limiter (15-min window: 10 fails/email+ip, 30/email) with `reset_rate_limit()` for tests.
 - Create: `backend/app/deps.py` — `DbSession = Annotated[Session, Depends(get_db)]`; `CurrentUser` dependency: read `session` cookie → sha256 → lookup unexpired UserSession → refresh if rolling window hit → return User; else 401.
 - Create: `backend/alembic/versions/0002_auth_tables.py` — users + sessions tables + unique indexes (todo's 0002 shape).
-- Create: `backend/tests/conftest.py` — todo pattern: env defaults host localhost port **5434** user masareef pw test db masareef_test; session fixture runs `alembic upgrade head`; `client` = TestClient(app); autouse `clean_tables` truncates all tables except `alembic_version` CASCADE after each test.
+- Create: `backend/tests/conftest.py` — todo pattern: env defaults host localhost port **5435** user masareef pw test db masareef_test; session fixture runs `alembic upgrade head`; `client` = TestClient(app); autouse `clean_tables` truncates all tables except `alembic_version` CASCADE after each test.
 - Test: `backend/tests/test_smoke.py`
 
-- [ ] Write `backend/tests/test_smoke.py`: `test_healthz` (200, `{"status":"ok"}`), `test_db_check_ok` (200 against test DB — set `DB_PORT`=5434 etc. in conftest env before importing app), `test_unknown_api_is_json_404`.
+- [ ] Write `backend/tests/test_smoke.py`: `test_healthz` (200, `{"status":"ok"}`), `test_db_check_ok` (200 against test DB — set `DB_PORT`=5435 etc. in conftest env before importing app), `test_unknown_api_is_json_404`.
 - [ ] Run `cd backend && ../.venv/bin/python -m pytest -q` → fails (no conftest yet). Implement conftest + db.py; ensure conftest sets `DB_HOST/PORT/NAME/USER/PASSWORD` env to the test DB **before** `from app.main import app` so `_db_conninfo()` and the engine both hit it.
 - [ ] Implement models.py, security.py, deps.py, migration 0002. Run pytest → smoke green.
 - [ ] Commit: `git add -A && git commit --no-gpg-sign -m "feat: backend foundation (db, models, security, deps, auth tables)"`
@@ -109,7 +109,7 @@
 
 **Files:**
 - Create: `backend/scripts/seed_demo.py` — idempotent-ish (skips if user exists): demo user `demo@masareef.local` / `demo1234`, space "Demo Household" EGP, ~180 transactions over 6 months (random-ish but deterministic via `random.Random(42)`; realistic EGP amounts per category; a few incomes; both members? single demo user is fine). Run: `cd backend && ../.venv/bin/python -m scripts.seed_demo` (needs `scripts/__init__.py`). Uses same env vars as app.
-- [ ] Run against test DB (`DB_PORT=5434 DB_USER=masareef DB_PASSWORD=test DB_NAME=masareef_test ...`), verify via a quick psql count, commit `feat: demo data seed script`.
+- [ ] Run against test DB (`DB_PORT=5435 DB_USER=masareef DB_PASSWORD=test DB_NAME=masareef_test ...`), verify via a quick psql count, commit `feat: demo data seed script`.
 
 ### Task 8: Frontend foundation — tokens, api, auth, router, layout, auth pages
 
@@ -184,11 +184,11 @@ Sections: Profile (display name inline edit); Space (name/kind/currency edit for
 
 **Files:**
 - Modify: `.github/workflows/ci.yaml` — add `test` job before/gating image build: Postgres 16 service (user masareef/pw test/db masareef_test, port 5432 mapped), steps: setup-python 3.12 + pip install -r requirements.txt -r requirements-dev.txt + `pytest -q` with TEST_DB_* env pointing at service; setup-node 24 + `npm ci` + `npm run test -- --run` + `npm run build`. `needs: test` on the build job. **Contract file — keep diff minimal; PR body must carry the divergence note.**
-- Modify: `AGENTS.md` — update "Current API routes" section (routers list), tests section (they now exist + how to run, port 5434), conventions unchanged.
+- Modify: `AGENTS.md` — update "Current API routes" section (routers list), tests section (they now exist + how to run, port 5435), conventions unchanged.
 - Modify: `docs/index.md`, `docs/using-your-app.md` — plain-language: what masareef does, how to install on the phone (Chrome → Install app), staging/prod URLs.
 - Modify: `README.md` — one-paragraph app description + local dev incl. test Postgres command.
 
-- [ ] Update conftest to read `TEST_DB_*` first then fall back to 5434 defaults (todo pattern) so CI's service (5432) and local (5434) both work.
+- [ ] Update conftest to read `TEST_DB_*` first then fall back to 5435 defaults (todo pattern) so CI's service (5432) and local (5435) both work.
 - [ ] Full local gate: backend pytest all green; `npm run test -- --run`; `npm run build`; `docker build`.
 - [ ] Commit `chore: CI test gate + docs refresh`.
 
