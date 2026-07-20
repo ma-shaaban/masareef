@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.db import utcnow
 from app.deps import CurrentUser, DbSession
-from app.services.seeds import seed_categories
+from app.services.seeds import seed_categories, seed_payment_methods
 
 router = APIRouter(prefix="/api", tags=["spaces"])
 
@@ -86,6 +86,7 @@ def create_space(body: SpaceCreate, user: CurrentUser, db: DbSession):
     db.flush()
     db.add(models.SpaceMember(space_id=space.id, user_id=user.id, role="owner"))
     seed_categories(db, space.id)
+    seed_payment_methods(db, space.id)
     return _space_json(space, "owner")
 
 

@@ -85,6 +85,45 @@ class Category(Base):
     )
 
 
+class PaymentMethod(Base):
+    __tablename__ = "payment_methods"
+
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid.uuid4)
+    space_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid, sa.ForeignKey("spaces.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    icon: Mapped[str] = mapped_column(sa.Text, nullable=False, server_default="")
+    sort_order: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default="0")
+    is_archived: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=sa.false()
+    )
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid.uuid4)
+    space_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid, sa.ForeignKey("spaces.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    is_archived: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=sa.false()
+    )
+
+
+class TransactionTag(Base):
+    __tablename__ = "transaction_tags"
+
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid, sa.ForeignKey("transactions.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid, sa.ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
@@ -98,7 +137,9 @@ class Transaction(Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         sa.Uuid, sa.ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
-    payment_method: Mapped[str] = mapped_column(sa.Text, nullable=False, server_default="cash")
+    payment_method_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.Uuid, sa.ForeignKey("payment_methods.id", ondelete="SET NULL"), nullable=True
+    )
     paid_by: Mapped[uuid.UUID | None] = mapped_column(
         sa.Uuid, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
