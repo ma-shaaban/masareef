@@ -38,7 +38,7 @@ def build_dataset(client, make_client):
     add(c2, 50, "2026-07-10", "Groceries")
     add(client, 80, "2026-07-10", "Dining")
     add(client, 20, "2026-07-15")
-    add(client, 500, "2026-07-01", None, "income", payment_method="bank")
+    add(client, 500, "2026-07-01", None, "income")
     add(client, 200, "2026-06-05", "Groceries")
     add(c2, 60, "2026-06-20", "Health")
     add(client, 90, "2026-05-11", "Dining")

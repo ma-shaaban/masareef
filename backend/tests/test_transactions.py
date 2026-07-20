@@ -24,15 +24,17 @@ def test_create_minimal_defaults(client):
     tx = r.json()
     assert tx["amount"] == 125.5
     assert tx["type"] == "expense"
-    assert tx["payment_method"] == "cash"
+    assert tx["payment_method"]["name"] == "Cash"  # space's first method
     assert tx["occurred_on"] == dt.date.today().isoformat()
     assert tx["paid_by"] == u["id"]
     assert tx["category"] is None
     assert tx["description"] == ""
+    assert tx["tags"] == []
 
 
 def test_create_full(client):
     u, space, cats = setup_space(client)
+    pms = {p["name"]: p for p in client.get(f"/api/spaces/{space['id']}/payment-methods").json()}
     r = add_tx(
         client,
         space["id"],
@@ -40,13 +42,14 @@ def test_create_full(client):
         type="income",
         occurred_on="2026-07-01",
         category_id=cats["Other"]["id"],
-        payment_method="bank",
+        payment_method_id=pms["Bank"]["id"],
         description="salary bits",
     )
     assert r.status_code == 201
     tx = r.json()
     assert tx["type"] == "income"
     assert tx["category"]["name"] == "Other"
+    assert tx["payment_method"]["name"] == "Bank"
     assert tx["paid_by_name"] == "Ana"
 
 
@@ -56,10 +59,15 @@ def test_amount_must_be_positive(client):
     assert add_tx(client, space["id"], amount=-5).status_code == 422
 
 
-def test_bad_type_and_payment_method_422(client):
+def test_bad_type_and_foreign_payment_method_422(client, make_client):
     _, space, _ = setup_space(client)
     assert add_tx(client, space["id"], amount=5, type="loan").status_code == 422
-    assert add_tx(client, space["id"], amount=5, payment_method="crypto").status_code == 422
+    c2 = make_client()
+    _, space2, _ = setup_space(c2, "eve@example.com", "Eve")
+    other_pm = c2.get(f"/api/spaces/{space2['id']}/payment-methods").json()[0]
+    assert (
+        add_tx(client, space["id"], amount=5, payment_method_id=other_pm["id"]).status_code == 422
+    )
 
 
 def test_foreign_category_422(client, make_client):

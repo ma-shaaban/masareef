@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from app import models, security
 from app.db import get_engine
-from app.services.seeds import seed_categories
+from app.services.seeds import seed_categories, seed_payment_methods
 from sqlalchemy.orm import sessionmaker
 
 DEMO_EMAIL = "demo@masareef.app"
@@ -32,7 +32,7 @@ PROFILE = [
     ("Entertainment", 0.6, 50, 400),
     ("Other", 0.4, 30, 300),
 ]
-PAYMENT_METHODS = ["cash", "cash", "card", "wallet", "bank"]
+PAYMENT_WEIGHTS = ["Cash", "Cash", "Card", "Wallet", "Bank"]
 
 
 def main() -> None:
@@ -57,10 +57,17 @@ def main() -> None:
         db.flush()
         db.add(models.SpaceMember(space_id=space.id, user_id=user.id, role="owner"))
         seed_categories(db, space.id)
+        seed_payment_methods(db, space.id)
         db.flush()
         cats = {
             c.name: c.id
             for c in db.query(models.Category).filter(models.Category.space_id == space.id)
+        }
+        pms = {
+            p.name: p.id
+            for p in db.query(models.PaymentMethod).filter(
+                models.PaymentMethod.space_id == space.id
+            )
         }
 
         today = dt.date.today()
@@ -78,7 +85,7 @@ def main() -> None:
                             amount=amount,
                             occurred_on=day,
                             category_id=cats[name],
-                            payment_method=rng.choice(PAYMENT_METHODS),
+                            payment_method_id=pms[rng.choice(PAYMENT_WEIGHTS)],
                             paid_by=user.id,
                             created_by=user.id,
                             description="",
@@ -95,7 +102,7 @@ def main() -> None:
                     type="income",
                     amount=Decimal(25000),
                     occurred_on=pay,
-                    payment_method="bank",
+                    payment_method_id=pms["Bank"],
                     paid_by=user.id,
                     created_by=user.id,
                     description="Salary",

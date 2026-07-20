@@ -16,8 +16,21 @@ DEFAULT_CATEGORIES = [
 ]
 
 
+DEFAULT_PAYMENT_METHODS = [
+    ("Cash", "💵"),
+    ("Card", "💳"),
+    ("Bank", "🏦"),
+    ("Wallet", "📱"),
+]
+
+
 def seed_categories(db, space_id) -> None:
     for i, (name, emoji, color) in enumerate(DEFAULT_CATEGORIES):
         db.add(
             models.Category(space_id=space_id, name=name, emoji=emoji, color=color, sort_order=i)
         )
+
+
+def seed_payment_methods(db, space_id) -> None:
+    for i, (name, icon) in enumerate(DEFAULT_PAYMENT_METHODS):
+        db.add(models.PaymentMethod(space_id=space_id, name=name, icon=icon, sort_order=i))
