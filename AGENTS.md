@@ -83,8 +83,11 @@ Template basics still present in `app/main.py`:
 
 Frontend: react-router v8 routes in `src/App.jsx` (Add `/`, History,
 Reports (lazy — recharts), Settings, Invite), auth context `src/auth.jsx`,
-space context `src/spaces.jsx`, fetch wrapper `src/api.js`, money/date
-helpers `src/format.js`, plain-CSS tokens `src/styles.css`. PWA =
+space context `src/spaces.jsx`, shared category-filter context
+`src/filters.jsx` (include/exclude id lists, persisted per space in
+localStorage, shared by History + Reports via the `CategoryFilterSheet`
+search sheet), fetch wrapper `src/api.js`, money/date helpers
+`src/format.js`, plain-CSS tokens `src/styles.css`. PWA =
 `public/manifest.webmanifest` + hand-rolled `public/sw.js` (network-first
 navigations, cache-first assets, `/api/*` passthrough) + icons regenerated
 by `scripts/gen-icons.sh`.

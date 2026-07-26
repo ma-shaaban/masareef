@@ -11,7 +11,8 @@ import {
   YAxis,
 } from 'recharts'
 import { api } from '../api.js'
-import CategoryFilter from '../components/CategoryFilter.jsx'
+import CategoryFilterSheet from '../components/CategoryFilterSheet.jsx'
+import { useCategoryFilter } from '../filters.jsx'
 import { addMonths, fmtMoney, monthLabel, monthRange, thisMonth } from '../format.js'
 import { useSpace } from '../spaces.jsx'
 
@@ -33,11 +34,10 @@ function rangeFor(preset, month) {
 
 export default function Reports() {
   const { space } = useSpace()
+  const { include, exclude, setFilter } = useCategoryFilter()
   const [preset, setPreset] = useState('month')
   const [month, setMonth] = useState(thisMonth())
   const [categories, setCategories] = useState([])
-  const [catInclude, setCatInclude] = useState([])
-  const [catExclude, setCatExclude] = useState([])
   const [summary, setSummary] = useState(null)
   const [byCategory, setByCategory] = useState([])
   const [byMember, setByMember] = useState([])
@@ -47,16 +47,27 @@ export default function Reports() {
   const { from, to } = rangeFor(preset, month)
 
   useEffect(() => {
-    api(`/api/spaces/${space.id}/categories`).then(setCategories).catch(() => {})
-    setCatInclude([])
-    setCatExclude([])
+    api(`/api/spaces/${space.id}/categories?include_archived=1`)
+      .then(setCategories)
+      .catch(() => {})
   }, [space.id])
+
+  // Drop stored filter ids for categories that no longer exist (self-heal).
+  useEffect(() => {
+    if (!categories.length) return
+    const ids = new Set(categories.map((c) => c.id))
+    const vi = include.filter((i) => ids.has(i))
+    const ve = exclude.filter((i) => ids.has(i))
+    if (vi.length !== include.length || ve.length !== exclude.length) {
+      setFilter(vi, ve)
+    }
+  }, [categories, include, exclude, setFilter])
 
   useEffect(() => {
     setError('')
     const catParams = new URLSearchParams()
-    for (const id of catInclude) catParams.append('category_ids', id)
-    for (const id of catExclude) catParams.append('exclude_category_ids', id)
+    for (const id of include) catParams.append('category_ids', id)
+    for (const id of exclude) catParams.append('exclude_category_ids', id)
     const cat = catParams.size ? `&${catParams}` : ''
     const params = new URLSearchParams({ from, to })
     Promise.all([
@@ -74,7 +85,7 @@ export default function Reports() {
         setMonthly(months)
       })
       .catch((err) => setError(err.message))
-  }, [space.id, preset, month, from, to, catInclude, catExclude])
+  }, [space.id, preset, month, from, to, include, exclude])
 
   const money = (n) => fmtMoney(n, space.currency)
   const rangeTotal = byCategory.reduce((sum, c) => sum + c.total, 0)
@@ -122,14 +133,13 @@ export default function Reports() {
         </div>
       )}
 
-      <CategoryFilter
-        categories={categories}
-        include={catInclude}
-        exclude={catExclude}
-        onChange={(inc, exc) => {
-          setCatInclude(inc)
-          setCatExclude(exc)
-        }}
+      <CategoryFilterSheet
+        categories={categories.filter(
+          (c) => !c.is_archived || include.includes(c.id) || exclude.includes(c.id),
+        )}
+        include={include}
+        exclude={exclude}
+        onChange={setFilter}
       />
 
       {error && <p className="error">{error}</p>}
