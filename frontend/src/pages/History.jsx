@@ -13,7 +13,7 @@ export default function History() {
   const { include, exclude, setFilter } = useCategoryFilter()
   const [month, setMonth] = useState(thisMonth())
   const [filters, setFilters] = useState({ paid_by: '', type: '', q: '' })
-  const [data, setData] = useState({ items: [], total: 0 })
+  const [data, setData] = useState({ items: [], total: 0, expense_total: 0, income_total: 0 })
   const [categories, setCategories] = useState([])
   const [members, setMembers] = useState([])
   const [paymentMethods, setPaymentMethods] = useState([])
@@ -56,7 +56,7 @@ export default function History() {
       try {
         const page = await api(`/api/spaces/${space.id}/transactions?${params}`)
         setData((prev) =>
-          offset === 0 ? page : { items: [...prev.items, ...page.items], total: page.total },
+          offset === 0 ? page : { ...page, items: [...prev.items, ...page.items] },
         )
       } catch (err) {
         setError(err.message)
@@ -97,6 +97,21 @@ export default function History() {
           ›
         </button>
       </div>
+
+      {filters.type !== 'income' && (
+        <div className="month-total-bar">
+          <span>Total spent</span>
+          <strong>{fmtMoney(data.expense_total, space.currency)}</strong>
+        </div>
+      )}
+      {filters.type !== 'expense' && data.income_total > 0 && (
+        <div className="month-total-bar">
+          <span>Income</span>
+          <strong style={{ color: 'var(--income)' }}>
+            {fmtMoney(data.income_total, space.currency)}
+          </strong>
+        </div>
+      )}
 
       <CategoryFilterSheet
         categories={categories.filter(

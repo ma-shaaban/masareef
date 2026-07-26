@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models
@@ -254,6 +255,15 @@ def list_transactions(
     if q:
         query = query.filter(models.Transaction.description.ilike(f"%{q}%"))
     total = query.count()
+    # Sums over the WHOLE filtered set (not just this page) so the UI can show
+    # a running month total that respects every active filter. The display
+    # outer-joins are one-to-one, so summing amount here never double-counts.
+    sum_rows = (
+        query.with_entities(models.Transaction.type, func.sum(models.Transaction.amount))
+        .group_by(models.Transaction.type)
+        .all()
+    )
+    sums = {t: float(s) for t, s in sum_rows}
     rows = (
         query.order_by(
             models.Transaction.occurred_on.desc(), models.Transaction.created_at.desc()
@@ -266,6 +276,8 @@ def list_transactions(
     return {
         "items": [_tx_json(tx, payer, pm, cats_by_tx.get(tx.id, [])) for tx, payer, pm in rows],
         "total": total,
+        "expense_total": sums.get("expense", 0.0),
+        "income_total": sums.get("income", 0.0),
     }
 
 

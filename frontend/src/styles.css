@@ -215,6 +215,20 @@ input, textarea, select, button { font: inherit; color: inherit; }
   font-weight: 600;
 }
 
+.month-total-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.month-total-bar span { color: var(--muted); font-size: 14px; }
+.month-total-bar strong { font-size: 18px; }
+
 /* ── category filter (button + search sheet) ── */
 .filter-btn {
   display: flex;

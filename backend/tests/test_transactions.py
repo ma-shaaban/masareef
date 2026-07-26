@@ -100,12 +100,17 @@ def test_list_filters_and_pagination(client):
     body = r.json()
     assert body["total"] == 4
     assert [t["amount"] for t in body["items"]] == [20, 99, 10, 30]  # newest occurred_on first
+    # sums span the whole filtered set, split by type
+    assert body["expense_total"] == 60  # 10 + 20 + 30
+    assert body["income_total"] == 99
 
     by_range = client.get(
         f"/api/spaces/{space['id']}/transactions",
         params={"from": "2026-07-01", "to": "2026-07-31"},
     ).json()
     assert by_range["total"] == 3
+    assert by_range["expense_total"] == 30  # July expenses only (10 + 20)
+    assert by_range["income_total"] == 99
 
     by_cat = client.get(
         f"/api/spaces/{space['id']}/transactions",
