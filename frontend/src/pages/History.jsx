@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
-import CategoryFilter from '../components/CategoryFilter.jsx'
+import CategoryFilterSheet from '../components/CategoryFilterSheet.jsx'
 import TxEditor from '../components/TxEditor.jsx'
+import { useCategoryFilter } from '../filters.jsx'
 import { addMonths, fmtDay, fmtMoney, monthLabel, monthRange, thisMonth } from '../format.js'
 import { useSpace } from '../spaces.jsx'
 
@@ -9,10 +10,9 @@ const PAGE = 100
 
 export default function History() {
   const { space } = useSpace()
+  const { include, exclude, setFilter } = useCategoryFilter()
   const [month, setMonth] = useState(thisMonth())
   const [filters, setFilters] = useState({ paid_by: '', type: '', q: '' })
-  const [catInclude, setCatInclude] = useState([])
-  const [catExclude, setCatExclude] = useState([])
   const [data, setData] = useState({ items: [], total: 0 })
   const [categories, setCategories] = useState([])
   const [members, setMembers] = useState([])
@@ -31,6 +31,17 @@ export default function History() {
       .catch(() => {})
   }, [space.id])
 
+  // Drop stored filter ids for categories that no longer exist (self-heal).
+  useEffect(() => {
+    if (!categories.length) return
+    const ids = new Set(categories.map((c) => c.id))
+    const vi = include.filter((i) => ids.has(i))
+    const ve = exclude.filter((i) => ids.has(i))
+    if (vi.length !== include.length || ve.length !== exclude.length) {
+      setFilter(vi, ve)
+    }
+  }, [categories, include, exclude, setFilter])
+
   const load = useCallback(
     async (offset = 0) => {
       setLoading(true)
@@ -40,8 +51,8 @@ export default function History() {
       for (const [k, v] of Object.entries(filters)) {
         if (v) params.set(k, v)
       }
-      for (const id of catInclude) params.append('category_ids', id)
-      for (const id of catExclude) params.append('exclude_category_ids', id)
+      for (const id of include) params.append('category_ids', id)
+      for (const id of exclude) params.append('exclude_category_ids', id)
       try {
         const page = await api(`/api/spaces/${space.id}/transactions?${params}`)
         setData((prev) =>
@@ -53,7 +64,7 @@ export default function History() {
         setLoading(false)
       }
     },
-    [space.id, month, filters, catInclude, catExclude],
+    [space.id, month, filters, include, exclude],
   )
 
   useEffect(() => {
@@ -87,14 +98,13 @@ export default function History() {
         </button>
       </div>
 
-      <CategoryFilter
-        categories={categories.filter((c) => !c.is_archived)}
-        include={catInclude}
-        exclude={catExclude}
-        onChange={(inc, exc) => {
-          setCatInclude(inc)
-          setCatExclude(exc)
-        }}
+      <CategoryFilterSheet
+        categories={categories.filter(
+          (c) => !c.is_archived || include.includes(c.id) || exclude.includes(c.id),
+        )}
+        include={include}
+        exclude={exclude}
+        onChange={setFilter}
       />
 
       <div className="seg">

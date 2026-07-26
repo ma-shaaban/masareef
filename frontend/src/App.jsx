@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx'
 import Settings from './pages/Settings.jsx'
 import Signup from './pages/Signup.jsx'
 import { SpaceProvider } from './spaces.jsx'
+import { FilterProvider } from './filters.jsx'
 
 // Reports pulls in the charting library — keep it out of the initial bundle
 // so the quick-add screen loads fast on the phone.
@@ -25,7 +26,9 @@ export default function App() {
             element={
               <RequireAuth>
                 <SpaceProvider>
-                  <Layout />
+                  <FilterProvider>
+                    <Layout />
+                  </FilterProvider>
                 </SpaceProvider>
               </RequireAuth>
             }
