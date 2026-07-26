@@ -22,6 +22,17 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          {/* Invite acceptance must work before the user has any space, so it
+              lives OUTSIDE SpaceProvider (which otherwise shows onboarding and
+              never renders its children for a space-less user). */}
+          <Route
+            path="/invite/:code"
+            element={
+              <RequireAuth>
+                <Invite />
+              </RequireAuth>
+            }
+          />
           <Route
             element={
               <RequireAuth>
@@ -44,7 +55,6 @@ export default function App() {
               }
             />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/invite/:code" element={<Invite />} />
           </Route>
         </Routes>
       </AuthProvider>

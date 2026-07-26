@@ -57,7 +57,10 @@ export default function Login() {
         </button>
       </form>
       <p className="alt">
-        New here? <Link to="/signup">Create an account</Link>
+        New here?{' '}
+        <Link to={`/signup?next=${encodeURIComponent(params.get('next') || '/')}`}>
+          Create an account
+        </Link>
       </p>
     </div>
   )
