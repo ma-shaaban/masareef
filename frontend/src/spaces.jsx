@@ -3,11 +3,11 @@ import { api } from './api.js'
 import CreateSpace from './pages/CreateSpace.jsx'
 
 const SpaceContext = createContext(null)
-const STORAGE_KEY = 'masareef.space'
+export const SPACE_STORAGE_KEY = 'masareef.space'
 
 export function SpaceProvider({ children }) {
   const [spaces, setSpaces] = useState(null) // null = loading
-  const [spaceId, setSpaceIdState] = useState(() => localStorage.getItem(STORAGE_KEY))
+  const [spaceId, setSpaceIdState] = useState(() => localStorage.getItem(SPACE_STORAGE_KEY))
 
   const refresh = useCallback(async () => {
     const list = await api('/api/spaces')
@@ -20,7 +20,7 @@ export function SpaceProvider({ children }) {
   }, [refresh])
 
   const setSpaceId = useCallback((id) => {
-    localStorage.setItem(STORAGE_KEY, id)
+    localStorage.setItem(SPACE_STORAGE_KEY, id)
     setSpaceIdState(id)
   }, [])
 

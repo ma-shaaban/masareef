@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { api } from '../api.js'
-import { useSpace } from '../spaces.jsx'
+import { SPACE_STORAGE_KEY } from '../spaces.jsx'
 
+// Self-contained on purpose: this page must work for a brand-new user who
+// has no space yet, so it renders OUTSIDE SpaceProvider (see App.jsx) and
+// must not depend on useSpace(). Accepting remembers the joined space in
+// localStorage; SpaceProvider picks it up when we navigate home.
 export default function Invite() {
   const { code } = useParams()
   const navigate = useNavigate()
-  const { setSpaceId, refresh } = useSpace()
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -24,8 +27,7 @@ export default function Invite() {
     setError('')
     try {
       const space = await api(`/api/invites/${code}/accept`, { method: 'POST' })
-      await refresh()
-      setSpaceId(space.id)
+      localStorage.setItem(SPACE_STORAGE_KEY, space.id)
       navigate('/', { replace: true })
     } catch (err) {
       setError(err.message)
@@ -34,11 +36,12 @@ export default function Invite() {
   }
 
   return (
-    <div className="card" style={{ marginTop: 20 }}>
+    <div className="authpage">
+      <h1>Masareef</h1>
       {error && <p className="error">{error}</p>}
       {!error && !preview && <p className="hint">Checking invite…</p>}
       {preview && (
-        <>
+        <div className="card">
           <h3>Join “{preview.space_name}”?</h3>
           <p className="meta">
             {preview.member_count} member{preview.member_count === 1 ? '' : 's'} so far. You'll see
@@ -47,7 +50,7 @@ export default function Invite() {
           <button className="btn block" onClick={accept} disabled={busy} style={{ marginTop: 10 }}>
             Join space
           </button>
-        </>
+        </div>
       )}
     </div>
   )
