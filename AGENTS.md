@@ -61,9 +61,13 @@ repeatable `category_ids` (include, any-of, any position) and
 concept.
 `backend/scripts/seed_demo.py` seeds a demo user with 6 months of data
 (`demo@masareef.app` / `demo1234`) — local/staging only, NEVER prod.
-`backend/scripts/import_notion_csv.py` imports the owner's Notion CSV
-export (tag→category/payment/tag mapping documented in its docstring; the
-Notion DB itself is live prod data — READ-ONLY, never modify it).
+Notion import: core mapping in `app/services/notion_import.py`
+(tag→category/payment mapping in its docstring), exposed as a CLI
+(`backend/scripts/import_notion_csv.py`) and a member-only HTTPS endpoint
+(`POST /api/spaces/{id}/import/notion-csv`, raw CSV body, `dry_run` +
+`paid_by` params — built because prod Postgres is in-cluster). NOT
+idempotent. The Notion DB itself is live prod data — READ-ONLY, never
+modify it.
 
 Design specs: `docs/superpowers/specs/2026-07-20-masareef-expense-tracker-design.md`
 (v1) + `2026-07-20-notion-alignment-design.md` (v1.1, real-data alignment)
