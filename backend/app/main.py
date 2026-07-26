@@ -11,7 +11,16 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, categories, imports, payment_methods, reports, spaces, transactions
+from app.routers import (
+    auth,
+    categories,
+    imports,
+    payment_methods,
+    receipts,
+    reports,
+    spaces,
+    transactions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +33,7 @@ app.include_router(transactions.router)
 app.include_router(payment_methods.router)
 app.include_router(reports.router)
 app.include_router(imports.router)
+app.include_router(receipts.router)
 
 
 def _db_conninfo() -> dict:

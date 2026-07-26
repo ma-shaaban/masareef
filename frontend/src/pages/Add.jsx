@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { useAuth } from '../auth.jsx'
 import CategoryChips from '../components/CategoryChips.jsx'
+import ReceiptField from '../components/ReceiptField.jsx'
 import { todayISO } from '../format.js'
+import { uploadReceipt } from '../receipt.js'
 import { useSpace } from '../spaces.jsx'
 
 function yesterdayISO() {
@@ -26,6 +28,8 @@ export default function Add() {
   const [pmId, setPmId] = useState(null)
   const [paidBy, setPaidBy] = useState(user.id)
   const [description, setDescription] = useState('')
+  const [receiptBlob, setReceiptBlob] = useState(null)
+  const [receiptKey, setReceiptKey] = useState(0) // bump to reset ReceiptField after save
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
@@ -56,7 +60,7 @@ export default function Add() {
     setError('')
     setBusy(true)
     try {
-      await api(`/api/spaces/${space.id}/transactions`, {
+      const tx = await api(`/api/spaces/${space.id}/transactions`, {
         method: 'POST',
         body: {
           amount: Math.round(parsed * 100) / 100,
@@ -69,10 +73,21 @@ export default function Add() {
         },
       })
       if (pmId) localStorage.setItem(pmKey, pmId)
+      let toastMsg = 'Saved ✓'
+      if (receiptBlob) {
+        // The expense is already saved; a failed receipt upload must not lose it.
+        try {
+          await uploadReceipt(tx.id, receiptBlob)
+        } catch {
+          toastMsg = 'Saved — receipt failed, add it from History'
+        }
+      }
       setAmount('')
       setDescription('')
-      setToast('Saved ✓')
-      setTimeout(() => setToast(''), 1800)
+      setReceiptBlob(null)
+      setReceiptKey((k) => k + 1)
+      setToast(toastMsg)
+      setTimeout(() => setToast(''), 2200)
       amountRef.current?.focus()
     } catch (err) {
       setError(err.message)
@@ -177,6 +192,8 @@ export default function Add() {
           maxLength={500}
         />
       </div>
+
+      <ReceiptField key={receiptKey} mode="deferred" onPendingChange={setReceiptBlob} />
 
       {error && <p className="error">{error}</p>}
       <button className="btn block" disabled={!valid || busy} style={{ marginTop: 12 }}>

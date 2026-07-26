@@ -229,6 +229,24 @@ input, textarea, select, button { font: inherit; color: inherit; }
 .month-total-bar span { color: var(--muted); font-size: 14px; }
 .month-total-bar strong { font-size: 18px; }
 
+/* ── receipt photo ── */
+.receipt { display: flex; align-items: center; gap: 12px; }
+.receipt-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.receipt-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.receipt-full {
+  max-width: 94vw;
+  max-height: 90dvh;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
 /* ── category filter (button + search sheet) ── */
 .filter-btn {
   display: flex;
