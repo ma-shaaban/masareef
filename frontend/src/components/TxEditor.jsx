@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api.js'
 import { todayISO } from '../format.js'
 import CategoryChips from './CategoryChips.jsx'
+import ReceiptField from './ReceiptField.jsx'
 
 export default function TxEditor({
   tx,
@@ -132,6 +133,7 @@ export default function TxEditor({
               maxLength={500}
             />
           </div>
+          <ReceiptField mode="live" txId={tx.id} hasReceipt={tx.has_receipt} />
           {error && <p className="error">{error}</p>}
           <div className="actions">
             <button type="button" className="btn danger" onClick={remove} disabled={busy}>

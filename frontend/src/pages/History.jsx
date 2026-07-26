@@ -176,6 +176,7 @@ export default function History() {
                       ...tx.categories.slice(1).map((c) => `${c.emoji}${c.name}`),
                       tx.paid_by_name,
                       tx.payment_method?.name,
+                      tx.has_receipt ? '📎' : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}

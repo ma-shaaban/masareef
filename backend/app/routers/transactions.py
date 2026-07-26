@@ -159,6 +159,7 @@ def _tx_json(
     payer: models.User | None,
     pm: models.PaymentMethod | None,
     categories: list[dict],
+    has_receipt: bool = False,
 ) -> dict:
     return {
         "id": str(tx.id),
@@ -173,7 +174,19 @@ def _tx_json(
         "paid_by": str(tx.paid_by) if tx.paid_by else None,
         "paid_by_name": payer.display_name if payer else None,
         "description": tx.description,
+        "has_receipt": has_receipt,
     }
+
+
+def _receipt_ids(db: Session, tx_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    if not tx_ids:
+        return set()
+    rows = (
+        db.query(models.Receipt.transaction_id)
+        .filter(models.Receipt.transaction_id.in_(tx_ids))
+        .all()
+    )
+    return {r[0] for r in rows}
 
 
 def _base_query(db: Session):
@@ -189,7 +202,13 @@ def _base_query(db: Session):
 
 def _fetch_tx_json(db: Session, tx_id: uuid.UUID) -> dict:
     tx, payer, pm = _base_query(db).filter(models.Transaction.id == tx_id).one()
-    return _tx_json(tx, payer, pm, _categories_for(db, [tx.id]).get(tx.id, []))
+    return _tx_json(
+        tx,
+        payer,
+        pm,
+        _categories_for(db, [tx.id]).get(tx.id, []),
+        has_receipt=bool(_receipt_ids(db, [tx.id])),
+    )
 
 
 def _get_tx_or_404(db: Session, tx_id: uuid.UUID, user: models.User) -> models.Transaction:
@@ -272,9 +291,14 @@ def list_transactions(
         .offset(offset)
         .all()
     )
-    cats_by_tx = _categories_for(db, [tx.id for tx, _, _ in rows])
+    tx_ids = [tx.id for tx, _, _ in rows]
+    cats_by_tx = _categories_for(db, tx_ids)
+    with_receipt = _receipt_ids(db, tx_ids)
     return {
-        "items": [_tx_json(tx, payer, pm, cats_by_tx.get(tx.id, [])) for tx, payer, pm in rows],
+        "items": [
+            _tx_json(tx, payer, pm, cats_by_tx.get(tx.id, []), tx.id in with_receipt)
+            for tx, payer, pm in rows
+        ],
         "total": total,
         "expense_total": sums.get("expense", 0.0),
         "income_total": sums.get("income", 0.0),

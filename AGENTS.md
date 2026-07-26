@@ -46,13 +46,18 @@ scripts/
 ## Current API surface
 
 Feature routers live in `backend/app/routers/` (auth, spaces, categories,
-payment_methods, transactions, reports), registered in `app/main.py`
-**above** the SPA catch-all. Shared deps in `app/deps.py` (`CurrentUser`,
-`DbSession`), security helpers (argon2, cookie sessions, login rate
-limiting) in `app/security.py`, ORM models in `app/models.py`, per-space
-seed data in `app/services/seeds.py`. Schema = alembic migrations
-`0001`–`0006` (app_meta, auth, spaces/invites/categories, transactions,
-payment-methods, unified categories). Payment methods are per-space rows
+payment_methods, transactions, reports, imports, receipts), registered in
+`app/main.py` **above** the SPA catch-all. Shared deps in `app/deps.py`
+(`CurrentUser`, `DbSession`), security helpers (argon2, cookie sessions,
+login rate limiting) in `app/security.py`, ORM models in `app/models.py`,
+per-space seed data in `app/services/seeds.py`. Schema = alembic migrations
+`0001`–`0007` (app_meta, auth, spaces/invites/categories, transactions,
+payment-methods, unified categories, receipts). The transactions list
+returns `expense_total`/`income_total` (sums over the whole filtered set)
+alongside the page + count. Receipt photos: one per transaction, bytes
+(compressed client-side) stored in the `receipts` BYTEA table, served from
+`GET /api/transactions/{id}/receipt` (member-guarded); the tx JSON carries
+`has_receipt`. Payment methods are per-space rows
 (NOT an enum). Categories are UNIFIED (owner decision, v1.2): a record
 carries an ordered `category_ids` list — position 0 is the MAIN category
 (drives the by-category report). Listing + all report endpoints accept

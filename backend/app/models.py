@@ -144,6 +144,21 @@ class Transaction(Base):
     )
 
 
+class Receipt(Base):
+    __tablename__ = "receipts"
+
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid.uuid4)
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        sa.Uuid, sa.ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    mime: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    bytes: Mapped[bytes] = mapped_column(sa.LargeBinary, nullable=False)
+    size: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
+
+
 class UserSession(Base):
     __tablename__ = "sessions"
 
